@@ -700,18 +700,23 @@ export const CustomerModal: React.FC<{
     onSelect: (name: string) => void;
     onClose: () => void;
 }> = ({ onSelect, onClose }) => {
-    const { invoices, companyConfig, notify } = useData();
+    const { invoices, customers, companyConfig, notify } = useData();
     const [showQuickAdd, setShowQuickAdd] = useState(false);
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerContact, setNewCustomerContact] = useState('');
 
     const customerNames = useMemo(() => {
         const names = new Set<string>();
+        // Add actual customers from CRM
+        customers?.forEach(c => {
+            if (c.name) names.add(c.name);
+        });
+        // Also keep legacy invoice customers just in case
         invoices?.forEach(inv => {
             if (inv.customerName) names.add(inv.customerName);
         });
         return Array.from(names).sort();
-    }, [invoices]);
+    }, [invoices, customers]);
 
     const handleQuickAdd = async (e: React.FormEvent) => {
         e.preventDefault();

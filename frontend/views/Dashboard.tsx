@@ -14,6 +14,7 @@ import { PricingCalculatorProvider, usePricingCalculator } from '../context/Pric
 import PricingCalculator from '../components/PricingCalculator';
 import WhatsAppMarketingModal from '../components/WhatsAppMarketingModal';
 import { dbService } from '../services/db';
+import { formatNumber, parseFormattedNumber } from '../utils/helpers';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -84,6 +85,13 @@ const DashboardStyleInjector = () => {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const toSafeNumber = (value: unknown): number => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const cleaned = value.replace(/,/g, '');
+    const n = parseFloat(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  }
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 };
@@ -100,12 +108,12 @@ const getInvoiceRevenueAmount = (invoice: any) => {
 
 const formatShortCurrency = (currency: string, value: number): string => {
   const curr = (currency || '').trim();
-  if (value >= 1_000_000) return `${curr} ${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000_000) return `${curr}${(value / 1_000_000).toFixed(2)}M`;
   if (value >= 1_000) {
     const kVal = value / 1_000;
-    return `${curr} ${kVal % 1 === 0 ? kVal : kVal.toFixed(1)}k`;
+    return `${curr}${kVal % 1 === 0 ? kVal : kVal.toFixed(1)}k`;
   }
-  return `${curr} ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return `${curr}${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 };
 
 const hasChartValues = (rows: Array<{ income: number; expenses: number }>) =>
@@ -1011,7 +1019,7 @@ const DashboardContent: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 11, color: '#64748b' }}>Amount due</div>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#b45309', backgroundColor: '#fffbeb', padding: '1px 8px', borderRadius: 6 }}>
-              {currency}{nextSubscription ? toSafeNumber(nextSubscription.totalAmount).toLocaleString() : '0'}
+              {currency}{nextSubscription ? formatNumber(toSafeNumber(nextSubscription.totalAmount)) : '0'}
             </div>
           </div>
         </div>
@@ -1131,7 +1139,7 @@ const DashboardContent: React.FC = () => {
     },
     {
       label: 'Active Jobs',
-      value: activeJobs.toLocaleString(),
+      value: formatNumber(activeJobs),
       rawValue: activeJobs,
       trend: null,
       trendLabel: 'In progress',
@@ -1733,7 +1741,7 @@ const DashboardContent: React.FC = () => {
                     letterSpacing: '-0.02em',
                     lineHeight: 1,
                   }}>
-                    {currency}{todaysCollection.toLocaleString()}
+                    {currency}{formatNumber(todaysCollection)}
                   </div>
                 </KpiValueAnimator>
 
@@ -1832,7 +1840,7 @@ const DashboardContent: React.FC = () => {
                     letterSpacing: '-0.02em',
                     lineHeight: 1,
                   }}>
-                    {currency}{revenueThisMonth.toLocaleString()}
+                    {currency}{formatNumber(revenueThisMonth)}
                   </div>
                 </KpiValueAnimator>
 
@@ -1863,7 +1871,7 @@ const DashboardContent: React.FC = () => {
                     })()}
                   </div>
                   <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>
-                    Goal: <span style={{ color: '#0f172a' }}>{currency}{(companyConfig?.monthlyRevenueTarget || 50000).toLocaleString()}</span>
+                    Goal: <span style={{ color: '#0f172a' }}>{currency}{formatNumber(companyConfig?.monthlyRevenueTarget || 50000)}</span>
                   </div>
                 </div>
 
@@ -1942,7 +1950,7 @@ const DashboardContent: React.FC = () => {
                     letterSpacing: '-0.02em',
                     lineHeight: 1,
                   }}>
-                    {currency}{receivables.toLocaleString()}
+{currency}{formatNumber(receivables)}
                   </div>
                 </KpiValueAnimator>
 
@@ -1966,7 +1974,7 @@ const DashboardContent: React.FC = () => {
                       alignItems: 'center',
                       gap: 2,
                     }}>
-                      ↑ {currency}{receivables.toLocaleString()}
+                      ↑ {currency}{formatNumber(receivables)}
                     </div>
                     <div style={{
                       fontSize: 10,
@@ -1991,7 +1999,7 @@ const DashboardContent: React.FC = () => {
                     {lastUnpaidInvoice ? (lastUnpaidInvoice.clientName || lastUnpaidInvoice.customerName) : 'No high debt'}
                   </div>
                   <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
-                    {currency}{lastUnpaidInvoice ? toSafeNumber(toSafeNumber(lastUnpaidInvoice.totalAmount) - toSafeNumber(lastUnpaidInvoice.paidAmount)).toLocaleString() : '0'}
+                    {currency}{lastUnpaidInvoice ? formatNumber(toSafeNumber(lastUnpaidInvoice.totalAmount) - toSafeNumber(lastUnpaidInvoice.paidAmount)) : '0'}
                   </div>
                   <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>
                     {lastUnpaidInvoice ? format(new Date(lastUnpaidInvoice.date || lastUnpaidInvoice.createdAt), 'MMM d') : '—'}

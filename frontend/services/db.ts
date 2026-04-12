@@ -478,9 +478,24 @@ export const dbService = {
             alert("WebUSB/WebFS restricted. Local backup service disabled.");
             return false;
         }
+        
+        // Extract company name for file naming
+        let companyName = 'PrimeBOOKS';
+        try {
+            const configStr = localStorage.getItem('nexus_company_config');
+            if (configStr) {
+                const config = JSON.parse(configStr);
+                if (config.companyName) {
+                    companyName = config.companyName.replace(/[^a-zA-Z0-9_\-]/g, '_');
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors, fallback to default
+        }
+
         try {
             fileHandle = await (window as any).showSaveFilePicker({
-                suggestedName: `PrimeBOOKS_Vault_${new Date().toISOString().split('T')[0]}.db`,
+                suggestedName: `${companyName}_Vault_${new Date().toISOString().split('T')[0]}.db`,
                 types: [{ description: 'ERP Backup', accept: { 'application/octet-stream': ['.db'] } }],
             });
             notifySyncState('connected');
@@ -610,7 +625,22 @@ export const dbService = {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `PrimeBOOKS_Manual_Backup_${new Date().toISOString().split('T')[0]}.db`;
+        
+        // Extract company name for file naming
+        let companyName = 'PrimeBOOKS';
+        try {
+            const configStr = localStorage.getItem('nexus_company_config');
+            if (configStr) {
+                const config = JSON.parse(configStr);
+                if (config.companyName) {
+                    companyName = config.companyName.replace(/[^a-zA-Z0-9_\-]/g, '_');
+                }
+            }
+        } catch (e) {
+            // Ignore parse errors, fallback to default
+        }
+
+        link.download = `${companyName}_Manual_Backup_${new Date().toISOString().split('T')[0]}.db`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -634,11 +664,16 @@ export const dbService = {
             }
         }
 
-        const keysToBackup = ['nexus_company_config', 'nexus_initialized'];
-        keysToBackup.forEach(key => {
-            const val = localStorage.getItem(key);
-            if (val) exportData.settings[key] = val;
-        });
+        // Export all local storage settings dynamically to ensure nothing is missed
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const val = localStorage.getItem(key);
+                if (val !== null && val !== undefined) {
+                    exportData.settings[key] = val;
+                }
+            }
+        }
 
         return new Blob([JSON.stringify(exportData)], { type: 'application/octet-stream' });
     },

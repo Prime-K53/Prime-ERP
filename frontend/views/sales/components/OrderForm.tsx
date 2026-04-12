@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { X, Save, Plus, Trash2, Calculator, Info, ShieldCheck, Building2, Package, Tag, Clock, Search, ChevronDown, Coins, UserPlus, Calendar, RefreshCw, Wallet, Mail, Layers, ExternalLink, FileText, Printer, FileDown, Eye, TrendingUp, Truck, Scale } from 'lucide-react';
+import { X, Save, Plus, Trash2, Calculator, Info, ShieldCheck, Building2, Package, Tag, Clock, Search, ChevronDown, Coins, UserPlus, Calendar, RefreshCw, Wallet, Mail, Layers, ExternalLink, FileText, Printer, FileDown, Eye, TrendingUp, Truck, Scale, Copy } from 'lucide-react';
 import { useData } from '../../../context/DataContext';
 import { useOrders } from '../../../context/OrdersContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -11,6 +11,7 @@ import { dbService } from '../../../services/db';
 import { useNavigate } from 'react-router-dom';
 import { VariantSelectorModal, ServiceCalculatorModal } from '../../pos/components/PosModals';
 import { Loader2 } from 'lucide-react';
+import QuickPrintModal from '../../../components/QuickPrintModal';
 
 import { useDocumentPreview } from '../../../hooks/useDocumentPreview';
 
@@ -322,6 +323,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({ type, initialData, onSave,
     const [serviceEditIndex, setServiceEditIndex] = useState<number | null>(null);
     const [serviceInitialValues, setServiceInitialValues] = useState<{ pages: number; copies: number }>({ pages: 1, copies: 1 });
     const [bomTemplates, setBomTemplates] = useState<BOMTemplate[]>([]);
+    const [quickPrintModal, setQuickPrintModal] = useState<{ open: boolean; type: 'photocopy' | 'printing' }>({
+      open: false,
+      type: 'photocopy'
+    });
     const isEditing = !!initialData?.id;
     const [localUnlock, setLocalUnlock] = useState(false);
     const isQuotation = type === 'Quotation';
@@ -997,6 +1002,58 @@ export const OrderForm: React.FC<OrderFormProps> = ({ type, initialData, onSave,
         };
 
         onSave(finalData, asDraft, auditReason, andPay);
+    };
+
+    const handleQuickService = (serviceName: string) => {
+        // Set the quick print modal state based on service name
+        if (serviceName === 'Printing') {
+            setQuickPrintModal({ open: true, type: 'printing' });
+        } else if (serviceName === 'Photocopy') {
+            setQuickPrintModal({ open: true, type: 'photocopy' });
+        }
+    };
+
+    const handleQuickPrintConfirm = (quantity: number, pagesPerCopy: number, total: number, printType: 'photocopy' | 'printing') => {
+        const isPhotocopy = printType === 'photocopy';
+        const pricePerPage = isPhotocopy 
+          ? (companyConfig.transactionSettings?.pos?.photocopyPrice || 2.00)
+          : (companyConfig.transactionSettings?.pos?.typePrintingPrice || 5.00);
+
+        // For quick print, we set price to the TOTAL (total pages × price per page) and quantity to 1
+        // This ensures the cart calculation (price × quantity) matches the modal total
+        const totalPages = quantity * pagesPerCopy;
+        const finalPrice = totalPages * pricePerPage;
+
+        const newItem: CartItem = {
+          id: `QUICK-${isPhotocopy ? 'PHOTO' : 'PRINT'}-${Date.now()}`,
+          itemId: isPhotocopy ? 'SVC-PHOTOCOPY' : 'SVC-TYPE-PRINT',
+          name: isPhotocopy ? 'Quick Photocopy' : 'Type & Printing',
+          sku: isPhotocopy ? 'QUICK-PHOTO' : 'QUICK-PRINT',
+          desc: isPhotocopy ? `Quick Photocopy (${pagesPerCopy} pages × ${quantity} copies)` : `Type & Printing (${pagesPerCopy} pages × ${quantity} copies)`,
+          price: finalPrice,
+          quantity: 1,
+          pagesOverride: pagesPerCopy,
+          category: 'Service',
+          type: 'Service',
+          unit: 'page',
+          pages: pagesPerCopy,
+          stock: 9999,
+          minStockLevel: 0,
+          adjustedPrice: finalPrice,
+          priceLocked: true,
+          lockedUnitPricePerCopy: finalPrice,
+          serviceDetails: {
+            pages: pagesPerCopy,
+            copies: quantity
+          }
+        };
+
+        setFormData((prev: any) => ({
+            ...prev,
+            items: [...prev.items, newItem]
+        }));
+
+        notify(`${quantity}x${pagesPerCopy} pages added to voucher`, 'success');
     };
 
     const handleAddItem = async (item: Item) => {
@@ -1924,6 +1981,28 @@ export const OrderForm: React.FC<OrderFormProps> = ({ type, initialData, onSave,
                                 </div>
                             ) : (
                                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5">
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                                        <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Quick Services</h4>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleQuickService('Printing')}
+                                                className="group flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all shadow-sm"
+                                            >
+                                                <Printer size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                                Printing
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleQuickService('Photocopy')}
+                                                className="group flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all shadow-sm"
+                                            >
+                                                <Copy size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+                                                Photocopy
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div className="flex justify-between items-center">
                                         <h3 className="text-[12px] font-normal text-slate-500 uppercase tracking-wider">Add Items to Voucher</h3>
                                         <div className="flex items-center gap-3">
@@ -2191,30 +2270,41 @@ export const OrderForm: React.FC<OrderFormProps> = ({ type, initialData, onSave,
                         </div>
                     </div>
                 </div>
+
+                {selectedProductForVariants && (
+                    <VariantSelectorModal
+                        product={selectedProductForVariants}
+                        onSelect={handleVariantSelect}
+                        onClose={() => setSelectedProductForVariants(null)}
+                    />
+                )}
+                {selectedServiceForCalculator && (
+                    <ServiceCalculatorModal
+                        service={selectedServiceForCalculator}
+                        currencySymbol={currency}
+                        initialPages={serviceInitialValues.pages}
+                        initialCopies={serviceInitialValues.copies}
+                        calculatePricing={(pages, copies) => calculateServicePricing(selectedServiceForCalculator, pages, copies)}
+                        onConfirm={handleServicePricingConfirm}
+                        onClose={() => {
+                            setSelectedServiceForCalculator(null);
+                            setServiceEditIndex(null);
+                        }}
+                    />
+                )}
+                {quickPrintModal.open && (
+                    <QuickPrintModal
+                        open={quickPrintModal.open}
+                        onClose={() => setQuickPrintModal({ open: false, type: 'photocopy' })}
+                        type={quickPrintModal.type}
+                        pricePerPage={quickPrintModal.type === 'photocopy' 
+                            ? (companyConfig.transactionSettings?.pos?.photocopyPrice || 2.00)
+                            : (companyConfig.transactionSettings?.pos?.typePrintingPrice || 5.00)}
+                        currency={currency}
+                        onConfirm={handleQuickPrintConfirm}
+                    />
+                )}
             </div>
-
-            {selectedProductForVariants && (
-                <VariantSelectorModal
-                    product={selectedProductForVariants}
-                    onSelect={handleVariantSelect}
-                    onClose={() => setSelectedProductForVariants(null)}
-                />
-            )}
-            {selectedServiceForCalculator && (
-                <ServiceCalculatorModal
-                    service={selectedServiceForCalculator}
-                    currencySymbol={currency}
-                    initialPages={serviceInitialValues.pages}
-                    initialCopies={serviceInitialValues.copies}
-                    calculatePricing={(pages, copies) => calculateServicePricing(selectedServiceForCalculator, pages, copies)}
-                    onConfirm={handleServicePricingConfirm}
-                    onClose={() => {
-                        setSelectedServiceForCalculator(null);
-                        setServiceEditIndex(null);
-                    }}
-                />
-            )}
-
-        </>
-    );
-};
+            </>
+        );
+    };
