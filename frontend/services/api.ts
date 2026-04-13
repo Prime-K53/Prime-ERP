@@ -16,6 +16,7 @@ import {
 } from '../types';
 import { transactionService } from './transactionService';
 import { generateNextId } from '../utils/helpers';
+import { generateNextSalesInvoiceNumber } from './documentNumberService';
 import { RenderPage, RenderNode, RenderText, RenderLine, RenderSecurity } from '../../contracts/RenderModel';
 import {
   recalculatePrice as recalculateProductPrice,
@@ -1271,8 +1272,7 @@ export const api = {
 
       if (selectedExams.length === 0) throw new Error("No marked exams found for selected batches");
 
-      const allInvoices = await dbService.getAll<Invoice>('invoices');
-      const invoice_id = generateNextId('invoice', allInvoices);
+      const invoice_id = await generateNextSalesInvoiceNumber();
 
       const totalAmount = selectedExams.reduce((sum, e) => sum + (e.selling_price || 0), 0);
 

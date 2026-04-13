@@ -1697,7 +1697,7 @@ const Settings: React.FC = () => {
 
                                         <div className="grid grid-cols-2 gap-10">
                                             {[
-                                                { key: 'invoice', label: 'Invoices', icon: FileCheck },
+                                                { key: 'invoice', label: 'Sales Invoices', icon: FileCheck },
                                                 { key: 'quotation', label: 'Sales Quotations', icon: PenTool },
                                                 { key: 'workorder', label: 'Work Orders', icon: Settings2 },
                                                 { key: 'purchaseorder', label: 'Purchase Bills', icon: ShoppingBag },

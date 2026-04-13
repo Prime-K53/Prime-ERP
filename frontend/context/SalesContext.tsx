@@ -11,6 +11,7 @@ import { transactionService } from '../services/transactionService';
 import { api } from '../services/api';
 import { examinationBatchService } from '../services/examinationBatchService';
 import { jobTicketConversionService } from '../services/jobTicketConversionService';
+import { generateNextSalesInvoiceNumber } from '../services/documentNumberService';
 import { addDays, addMonths, addYears, isBefore, parseISO, format, isSameDay } from 'date-fns';
 
 import { customerNotificationService, type NotificationActivityType } from '../services/customerNotificationService';
@@ -695,7 +696,7 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const convertQuotationToInvoice = async (q: Quotation): Promise<string> => {
-        const invId = generateNextId('invoice', finance.invoices, companyConfig);
+        const invId = await generateNextSalesInvoiceNumber(companyConfig);
         const resolvedCustomerId = resolveCustomerId(q.customerId, q.customerName);
         const issuedDate = new Date().toISOString();
         const customerProfile = salesStore.customers.find(c => c.id === resolvedCustomerId || c.name === q.customerName);
@@ -765,7 +766,7 @@ export const SalesProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const convertJobOrderToInvoice = async (jo: JobOrder): Promise<string> => {
-        const invId = generateNextId('invoice', finance.invoices, companyConfig);
+        const invId = await generateNextSalesInvoiceNumber(companyConfig);
         const product = inventoryStore.inventory.find(i => i.id === (jo as any).productId);
         const price = product?.price || 0;
         const totalAmount = jo.totalQuantity * price;

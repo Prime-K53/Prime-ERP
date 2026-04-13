@@ -1984,23 +1984,19 @@ export const OrderForm: React.FC<OrderFormProps> = ({ type, initialData, onSave,
                                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
                                         <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Quick Services</h4>
                                         <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickService('Printing')}
-                                                className="group flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all shadow-sm"
-                                            >
-                                                <Printer size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                                Printing
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleQuickService('Photocopy')}
-                                                className="group flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 transition-all shadow-sm"
-                                            >
-                                                <Copy size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                                                Photocopy
-                                            </button>
-                                        </div>
+<button
+    onClick={() => handleQuickService('Printing')}
+    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-1.5 text-sm"
+>
+    <FileText size={16} /> Type and Printing
+</button>
+                                             <button
+                                                 onClick={() => handleQuickService('Photocopy')}
+                                                 className="text-blue-600 hover:underline flex items-center gap-1.5 text-sm font-semibold"
+                                             >
+                                                 <Copy size={16} /> Photocopy
+                                             </button>
+                                         </div>
                                     </div>
 
                                     <div className="flex justify-between items-center">

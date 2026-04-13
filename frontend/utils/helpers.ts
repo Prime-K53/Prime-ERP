@@ -165,6 +165,20 @@ export const formatNumber = (num: number): string => {
   }).format(num || 0);
 };
 
+export const parseFormattedNumber = (value: string): number => {
+  if (!value) return 0;
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
+export const formatNumberCompact = (num: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num || 0);
+};
+
 /**
  * Standard financial rounding based on CompanyConfig rules.
  */

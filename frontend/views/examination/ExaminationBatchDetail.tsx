@@ -598,6 +598,8 @@ const ExaminationBatchDetail: React.FC = () => {
     );
   }
 
+  const batchReference = String(batch.batch_number || batch.batchNumber || batch.id || '').trim();
+
   return (
     <div className="h-full flex flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full font-normal overflow-y-auto custom-scrollbar">
       <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-4">
@@ -612,6 +614,11 @@ const ExaminationBatchDetail: React.FC = () => {
           </button>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-[22px] font-semibold text-slate-900 tracking-tight">{batch.name}</h1>
+            {batchReference && (
+              <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-mono bg-slate-100 text-slate-600 border border-slate-200">
+                {batchReference}
+              </span>
+            )}
             {batch.type === 'Patch' && (
               <span className="inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-100">
                 Patch

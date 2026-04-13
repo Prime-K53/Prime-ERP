@@ -106,15 +106,25 @@ const getInvoiceRevenueAmount = (invoice: any) => {
   return toSafeNumber(invoice?.totalAmount);
 };
 
-const formatShortCurrency = (currency: string, value: number): string => {
-  const curr = (currency || '').trim();
-  if (value >= 1_000_000) return `${curr}${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) {
-    const kVal = value / 1_000;
-    return `${curr}${kVal % 1 === 0 ? kVal : kVal.toFixed(1)}k`;
-  }
-  return `${curr}${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-};
+const getGreeting = (): string => {
+   const hour = new Date().getHours();
+   if (hour < 12) return 'Good morning';
+   if (hour < 18) return 'Good afternoon';
+   return 'Good evening';
+ };
+
+ const formatShortCurrency = (currency: string, value: number): string => {
+   const curr = (currency || '').trim();
+   if (value >= 1_000_000) {
+     const mVal = value / 1_000_000;
+     return `${curr}${mVal % 1 === 0 ? mVal : mVal.toFixed(1)}M`;
+   }
+   if (value >= 1_000) {
+     const kVal = value / 1_000;
+     return `${curr}${kVal % 1 === 0 ? kVal : kVal.toFixed(1)}k`;
+   }
+   return `${curr}${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+ };
 
 const hasChartValues = (rows: Array<{ income: number; expenses: number }>) =>
   rows.some(r => toSafeNumber(r.income) > 0 || toSafeNumber(r.expenses) > 0);
@@ -1319,15 +1329,15 @@ const DashboardContent: React.FC = () => {
           position: 'relative',
           zIndex: 100,
         }}>
-          {/* Left: Greeting & Company Dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            <h1 
-              onClick={() => setShowCompanyMenu(!showCompanyMenu)}
-              style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 10, color: '#2e2a5d', cursor: 'pointer' }}
-            >
-              Hello, <span style={{ fontWeight: 400, color: '#5b578c' }}>{displayCompanyName}</span>
-              <ChevronDown size={18} color="#5b578c" style={{ transform: showCompanyMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-            </h1>
+           {/* Left: Greeting & Company Dropdown */}
+           <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+             <h1 
+               onClick={() => setShowCompanyMenu(!showCompanyMenu)}
+               style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 10, color: '#2e2a5d', cursor: 'pointer' }}
+             >
+               {getGreeting()}, <span style={{ fontWeight: 400, color: '#5b578c' }}>{displayCompanyName}</span>
+               <ChevronDown size={18} color="#5b578c" style={{ transform: showCompanyMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+             </h1>
             
             {showCompanyMenu && (
               <div style={{

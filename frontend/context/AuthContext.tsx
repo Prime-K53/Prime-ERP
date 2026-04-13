@@ -4,6 +4,7 @@ import { MOCK_USERS, INITIAL_USER_GROUPS, AVAILABLE_PERMISSIONS } from '../const
 import { generateNextId } from '../utils/helpers';
 import { dbService } from '../services/db';
 import { DEFAULT_PRICING_SETTINGS } from '../services/pricingRoundingService';
+import { syncDocumentNumberSeriesConfig } from '../services/documentNumberService';
 import { isPasswordProtectionEnabled, normalizeSecuritySettings, withNormalizedSecurityConfig } from '../utils/securitySettings';
 
 interface Notification {
@@ -623,6 +624,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     setCompanyConfig(normalizedConfig);
     localStorage.setItem('nexus_company_config', JSON.stringify(normalizedConfig));
+    void syncDocumentNumberSeriesConfig(normalizedConfig).catch((error) => {
+      console.error('Failed to sync document numbering configuration', error);
+    });
     const passwordProtectionEnabled = isPasswordProtectionEnabled(normalizedConfig);
     if (!passwordProtectionEnabled) {
       const bypassSession = buildPasswordBypassSession(normalizedConfig, allUsers);

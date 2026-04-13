@@ -42,7 +42,7 @@ interface ExaminationContextType {
   schools: School[];
   customers: Customer[];
   marketAdjustments: MarketAdjustment[];
-  
+
   // New Batches
   batches: ExaminationBatch[];
   batchLoadError: string | null;
@@ -66,7 +66,7 @@ interface ExaminationContextType {
   loading: boolean;
   jobLoading: boolean;
   groupLoading: boolean;
-  
+
   // Actions
   loadAllData: () => Promise<void>;
   createJob: (payload: ExaminationJobPayload) => Promise<ExaminationJob>;
@@ -75,27 +75,27 @@ interface ExaminationContextType {
   recalculateJob: (examId: string) => Promise<ExaminationJob>;
   approveJob: (examId: string) => Promise<ExaminationJob>;
   createInvoiceForJobs: (jobIds: string[]) => Promise<{ invoice_id: string; total_amount: number; job_ids: string[] }>;
-  
+
   // Groups
   createGroup: (payload: ExaminationGroupPayload) => Promise<ExaminationInvoiceGroup>;
   addJobsToGroup: (groupId: string, jobIds: string[]) => Promise<ExaminationInvoiceGroup>;
   removeJobFromGroup: (groupId: string, jobId: string) => Promise<ExaminationInvoiceGroup>;
   deleteGroup: (groupId: string) => Promise<void>;
   generateInvoiceForGroup: (groupId: string) => Promise<{ invoice_id: string; total_amount: number; job_ids: string[] }>;
-  
+
   // Recurring
   createRecurringProfile: (sourceType: 'job' | 'group', sourceId: string, payload: ExaminationRecurringPayload) => Promise<ExaminationRecurringProfile>;
   pauseRecurringProfile: (profileId: string) => Promise<ExaminationRecurringProfile>;
   resumeRecurringProfile: (profileId: string) => Promise<ExaminationRecurringProfile>;
   deleteRecurringProfile: (profileId: string) => Promise<void>;
   runRecurringBilling: (asOfDate?: string) => Promise<{ processed_profiles: number; generated_invoices: number; errors: Array<{ profile_id: string; error: string }> }>;
-  
+
   // Utilities
   getJobWithSubjects: (examId: string) => Promise<{ job: ExaminationJob; subjects: ExaminationJobSubject[] }>;
   getJobsBySchool: (schoolId: string) => ExaminationJob[];
   getJobsByStatus: (status: ExaminationJob['status']) => ExaminationJob[];
   getAvailableJobsForGroup: (schoolId: string) => ExaminationJob[];
-  
+
   // Pricing Lock
   lockPricing: (examId: string, userId?: string) => Promise<ExaminationJobState>;
   unlockPricing: (examId: string) => Promise<ExaminationJobState>;
@@ -159,7 +159,7 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
     const request = (async () => {
       setLoading(true);
       const DEFAULT_TIMEOUT = 15000; // 15 seconds for UI responsiveness
-      
+
       try {
         const [
           jobsResult,
@@ -336,7 +336,7 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
 
       // Extract subjects from batch classes
       const subjects: BatchToProductionPayload['subjects'] = [];
-      
+
       if (batch.classes && batch.classes.length > 0) {
         for (const cls of batch.classes) {
           if (cls.subjects && cls.subjects.length > 0) {
@@ -445,7 +445,7 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
       // Create notification for batch approval
       try {
         await sendBatchApprovedNotification(result, user?.id);
-        
+
         // Trigger Customer Notification (External messaging app)
         const school = schools.find(s => String(s.id) === String(result.school_id));
         if (school?.phone) {
@@ -485,10 +485,10 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
 
         const normalizedInvoicePayload: ExaminationGeneratedInvoicePayload = resolvedSchoolName
           ? {
-              ...result.invoice,
-              customerName: resolvedSchoolName,
-              schoolName: resolvedSchoolName
-            }
+            ...result.invoice,
+            customerName: resolvedSchoolName,
+            schoolName: resolvedSchoolName
+          }
           : result.invoice;
 
         syncedInvoicePayload = normalizedInvoicePayload;
@@ -635,8 +635,8 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
     try {
       const result = await examinationJobService.createInvoiceForJobs(jobIds);
       // Update job statuses
-      setJobs(prev => prev.map(job => 
-        jobIds.includes(job.id) 
+      setJobs(prev => prev.map(job =>
+        jobIds.includes(job.id)
           ? { ...job, status: 'Invoiced' as const, invoice_id: result.invoice_id }
           : job
       ));
@@ -686,8 +686,8 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
       await examinationJobService.deleteInvoiceGroup(groupId);
       setGroups(prev => prev.filter(group => group.id !== groupId));
       // Remove group assignment from jobs
-      setJobs(prev => prev.map(job => 
-        job.invoice_group_id === groupId 
+      setJobs(prev => prev.map(job =>
+        job.invoice_group_id === groupId
           ? { ...job, invoice_group_id: undefined }
           : job
       ));
@@ -700,14 +700,14 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
     setGroupLoading(true);
     try {
       const result = await examinationJobService.generateInvoiceForGroup(groupId);
-      setGroups(prev => prev.map(group => 
-        group.id === groupId 
+      setGroups(prev => prev.map(group =>
+        group.id === groupId
           ? { ...group, status: 'Invoiced' as const, invoice_id: result.invoice_id }
           : group
       ));
       // Update job statuses
-      setJobs(prev => prev.map(job => 
-        job.invoice_group_id === groupId 
+      setJobs(prev => prev.map(job =>
+        job.invoice_group_id === groupId
           ? { ...job, status: 'Invoiced' as const, invoice_id: result.invoice_id }
           : job
       ));
@@ -789,9 +789,9 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
   }, [jobs]);
 
   const getAvailableJobsForGroup = useCallback((schoolId: string) => {
-    return jobs.filter(job => 
-      job.school_id === schoolId && 
-      job.status !== 'Invoiced' && 
+    return jobs.filter(job =>
+      job.school_id === schoolId &&
+      job.status !== 'Invoiced' &&
       !job.invoice_group_id
     );
   }, [jobs]);
@@ -807,12 +807,12 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
     marketAdjustments,
     batches,
     batchLoadError,
-    
+
     // Loading states
     loading,
     jobLoading,
     groupLoading,
-    
+
     // Actions
     loadAllData,
     loadBatches,
@@ -823,14 +823,27 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
     approveBatch,
     generateInvoice,
     convertBatchToJobTicket: async (id: string) => {
+      if (!user) {
+        notify('You must be logged in to convert batches to job tickets.', 'error');
+        throw new Error('User not authenticated');
+      }
+
       setLoading(true);
       try {
+        // Verify batch exists locally first
+        const localBatch = await examinationBatchService.getBatch(id);
+        if (!localBatch) {
+          throw new Error('Examination batch data not found locally.');
+        }
+        const batchReference = String(localBatch.batch_number || localBatch.batchNumber || localBatch.name || id).trim() || id;
+
         const result = await jobTicketConversionService.convertExaminationBatchToJobTicket(id, {
-          requestedBy: user?.username || user?.id || 'system',
-          requesterRole: user?.role || 'System'
+          requestedBy: user.username || user.id,
+          requesterRole: user.role || 'User'
         });
-        await loadBatches();
-        notify(`Batch ${id} converted to Job Ticket ${result.jobTicketId}`, 'success');
+
+        await Promise.all([loadBatches(), loadAllData()]);
+        notify(`Batch ${batchReference} converted to Job Ticket ${result.jobTicketId}`, 'success');
         return result.jobTicketId;
       } catch (error: any) {
         notify(`Conversion Failed: ${error.message}`, 'error');
@@ -846,27 +859,27 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
     recalculateJob,
     approveJob,
     createInvoiceForJobs,
-    
+
     // Groups
     createGroup,
     addJobsToGroup,
     removeJobFromGroup,
     deleteGroup,
     generateInvoiceForGroup,
-    
+
     // Recurring
     createRecurringProfile,
     pauseRecurringProfile,
     resumeRecurringProfile,
     deleteRecurringProfile,
     runRecurringBilling,
-    
+
     // Utilities
     getJobWithSubjects,
     getJobsBySchool,
     getJobsByStatus,
     getAvailableJobsForGroup,
-    
+
     // Pricing Lock
     lockPricing: async (examId: string, userId?: string) => {
       setJobLoading(true);

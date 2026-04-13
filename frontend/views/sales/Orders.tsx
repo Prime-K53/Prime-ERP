@@ -19,7 +19,7 @@ import { JobOrderDetails } from './components/JobOrderDetails';
 import { QuotationDetails } from './components/QuotationDetails';
 import { OrderDetails } from './components/OrderDetails';
 import SubscriptionView from './components/SubscriptionView';
-import { generateNextId, parseTemplate, downloadBlob, resolveCustomerPaymentPolicy } from '../../utils/helpers';
+import { parseTemplate, downloadBlob, resolveCustomerPaymentPolicy } from '../../utils/helpers';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { localFileStorage } from '../../services/localFileStorage';
 import { OfflineImage } from '../../components/OfflineImage';
@@ -886,7 +886,6 @@ const Orders: React.FC = () => {
             if (action === 'convert_to_invoice') {
                 if (window.confirm(`Convert Order #${item.orderNumber} to an Invoice?`)) {
                     try {
-                        const invoiceId = generateNextId('invoice', invoices, companyConfig);
                         const issuedDate = new Date().toISOString().split('T')[0];
                         const customer = customers.find((entry: any) =>
                             entry.id === item.customerId || entry.name === item.customerName
@@ -899,7 +898,6 @@ const Orders: React.FC = () => {
                             preserveCustomTerms: true
                         });
                         const newInvoice: Invoice = {
-                            id: invoiceId,
                             customerName: item.customerName,
                             customerId: item.customerId,
                             date: issuedDate,
@@ -918,7 +916,7 @@ const Orders: React.FC = () => {
                             type: 'standard' as any,
                             paymentTerms: paymentPolicy.paymentTerms
                         };
-                        await addInvoice(newInvoice);
+                        const invoiceId = await addInvoice(newInvoice);
                         await updateOrderStatus(item.id, 'Completed');
                         notify(`Order #${item.orderNumber} successfully converted to Invoice ${invoiceId}`, "success");
                         setActiveTab('Invoices');
@@ -1046,7 +1044,6 @@ const Orders: React.FC = () => {
 
                             const invoiceData = {
                                 ...order,
-                                id: generateNextId('invoice', invoices, companyConfig),
                                 date: new Date().toISOString().split('T')[0],
                                 status: 'Unpaid',
                                 notes: `Converted from [Order] #[${order.orderNumber}] on [${new Date().toLocaleString()}] as accepted by [${user?.name || 'System'}]`,

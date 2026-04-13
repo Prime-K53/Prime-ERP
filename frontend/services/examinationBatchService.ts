@@ -1,6 +1,7 @@
 import { ExaminationBatch, ExaminationClass, ExaminationPricingSettings, ExaminationSubject, Item, MarketAdjustment } from '../types';
 import { getUrl } from '../config/api.js';
 import { dbService } from './db';
+import { generateNextExaminationBatchNumber } from './documentNumberService';
 
 export interface ExaminationInvoiceLineItem {
   id: string;
@@ -141,9 +142,11 @@ const normalizeBatchForStorage = (
   const id = String(batch.id || batch.batch_id || generateLocalId());
   const createdAt = String(batch.created_at || batch.createdAt || toIso());
   const updatedAt = String(batch.updated_at || batch.updatedAt || createdAt);
+  const batchNumber = String(batch.batch_number || batch.batchNumber || '').trim();
   return {
     ...batch,
     id,
+    ...(batchNumber ? { batch_number: batchNumber, batchNumber } : {}),
     created_at: createdAt,
     updated_at: updatedAt,
     ...overrides,
@@ -154,6 +157,8 @@ const normalizeBatchForStorage = (
 const writeFallbackBatches = (batches: Array<Record<string, any>>) => {
   const trimmed = batches.map((batch) => ({
     id: String(batch.id),
+    batch_number: batch.batch_number || batch.batchNumber || '',
+    batchNumber: batch.batchNumber || batch.batch_number || '',
     school_id: batch.school_id,
     name: batch.name,
     academic_year: batch.academic_year,
@@ -648,12 +653,20 @@ export const examinationBatchService = {
   },
 
   async createBatch(payload: Partial<ExaminationBatch>): Promise<ExaminationBatch> {
-    console.log('[DEBUG] examinationBatchService.createBatch - Starting request with payload:', payload);
+    const incomingBatchNumber = String((payload as any)?.batch_number || (payload as any)?.batchNumber || '').trim();
+    const reservedBatchNumber = incomingBatchNumber || await generateNextExaminationBatchNumber();
+    const payloadWithBatchNumber = {
+      ...payload,
+      batch_number: reservedBatchNumber,
+      batchNumber: reservedBatchNumber
+    };
+
+    console.log('[DEBUG] examinationBatchService.createBatch - Starting request with payload:', payloadWithBatchNumber);
     const headers = getHeaders();
     console.log('[DEBUG] examinationBatchService.createBatch - Headers:', headers);
 
     try {
-      const result = await createBatchRemote(payload);
+      const result = await createBatchRemote(payloadWithBatchNumber);
       console.log('[DEBUG] examinationBatchService.createBatch - Success result:', result);
       await storeLocalBatch({
         ...result,
@@ -670,7 +683,7 @@ export const examinationBatchService = {
       const now = toIso();
       const offlineBatch = normalizeBatchForStorage(
         {
-          ...payload,
+          ...payloadWithBatchNumber,
           status: payload.status || 'Draft'
         },
         {
@@ -682,7 +695,7 @@ export const examinationBatchService = {
         }
       );
       await storeLocalBatch(offlineBatch);
-      await enqueueOutbox('examinationBatch:create', String(offlineBatch.id), payload as any);
+      await enqueueOutbox('examinationBatch:create', String(offlineBatch.id), payloadWithBatchNumber as any);
       return offlineBatch as ExaminationBatch;
     }
   },

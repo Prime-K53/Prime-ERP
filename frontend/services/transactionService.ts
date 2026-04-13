@@ -14,6 +14,7 @@ import { BankAccount, BankTransaction } from '../types/banking';
 import { MultiCurrencyJournalEntry, MultiCurrencyTransactionLine, CurrencyGainLoss } from '../types/currency';
 
 import { assertInvoiceNumberFormat, calculateDueDate, generateNextId, resolveCustomerPaymentTerms, roundToCurrency } from '../utils/helpers';
+import { generateNextSalesInvoiceNumber } from './documentNumberService';
 import { pagesToReams, pagesToTonerKg } from '../utils/printConversions';
 import { inferSignatureInputMode, resolveSignatureDataUrl } from '../utils/signatureUtils';
 import {
@@ -1492,7 +1493,7 @@ export const transactionService = {
                     }
                 }
                 if (!invoiceId) {
-                    invoiceId = generateNextId('invoice', existingInvoices);
+                    invoiceId = await generateNextSalesInvoiceNumber();
                 }
 
                 const invoice: Invoice = {

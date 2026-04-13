@@ -105,10 +105,19 @@ export const formatDocumentNumber = (
 
 export const extractDocumentNumberValue = (
   documentNumber: string,
-  rule: Pick<NumberingRule, 'suffix'> | null | undefined
+  rule: Pick<NumberingRule, 'prefix' | 'suffix'> | null | undefined
 ) => {
   const raw = String(documentNumber || '').trim();
   if (!raw) return null;
+
+  const prefix = String(rule?.prefix || '').trim();
+  if (prefix) {
+    const separatorPattern = /[-/\s]$/.test(prefix) ? '' : '[-/\\s]?';
+    const prefixPattern = new RegExp(`^${escapeRegex(prefix)}${separatorPattern}`, 'i');
+    if (!prefixPattern.test(raw)) {
+      return null;
+    }
+  }
 
   const suffix = String(rule?.suffix || '');
   const withoutSuffix = suffix && raw.endsWith(suffix)
@@ -263,6 +272,8 @@ export const generateNextNumber = async (
   const effectiveConfig = companyConfig || getCompanyConfig();
   const definition = SERIES_DEFINITIONS[seriesKey];
 
+  await syncDocumentNumberSeriesConfig(effectiveConfig);
+
   return dbService.executeAtomicOperation(['settings'], async (tx) => {
     const store = tx.objectStore('settings');
     const currentRule = await getStoredSeries(store, seriesKey, effectiveConfig);
@@ -283,4 +294,12 @@ export const generateNextNumber = async (
 
     return documentNumber;
   });
+};
+
+export const generateNextSalesInvoiceNumber = async (companyConfig?: CompanyConfig | null) => {
+  return generateNextNumber('sales_invoice', companyConfig);
+};
+
+export const generateNextExaminationBatchNumber = async (companyConfig?: CompanyConfig | null) => {
+  return generateNextNumber('examination_batch', companyConfig);
 };

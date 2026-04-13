@@ -22,6 +22,7 @@ import {
 import { dbService } from './db';
 import { isMarketAdjustmentActive } from '../utils/marketAdjustmentUtils';
 import { generateNextId, roundToCurrency } from '../utils/helpers';
+import { generateNextSalesInvoiceNumber } from './documentNumberService';
 import { productionCostService } from './productionCostService';
 import { inventoryTransactionService } from './inventoryTransactionService';
 import { EXAM_HIDDEN_BOM_TEMPLATE_ID } from './examHiddenBomService';
@@ -1635,8 +1636,7 @@ class ExaminationJobService {
         .filter(Boolean)
     ));
 
-    const allInvoices = await dbService.getAll<Invoice>('invoices');
-    const invoiceId = generateNextId('invoice', allInvoices);
+    const invoiceId = await generateNextSalesInvoiceNumber();
     const now = new Date();
 
     const items = refreshedJobs.map(job => buildInvoiceItemFromJob(job));

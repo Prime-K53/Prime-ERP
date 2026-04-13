@@ -107,6 +107,13 @@ const inferJobTicketType = (...values: any[]): JobTicket['type'] => {
   return 'Printing';
 };
 
+const resolveBatchReference = (batch: any) => (
+  toSafeString(batch?.batch_number)
+  || toSafeString(batch?.batchNumber)
+  || toSafeString(batch?.name)
+  || toSafeString(batch?.id)
+);
+
 const mapQuotationToWorkOrder = (quotation: any, workOrderId: string) => {
   const firstItem = Array.isArray(quotation.items) && quotation.items.length > 0 ? quotation.items[0] : {};
   const totalQuantity = (quotation.items || []).reduce((sum: number, item: any) => sum + toSafeNumber(item.quantity, 0), 0) || 1;
@@ -182,6 +189,7 @@ const mapQuotationToTicket = (quotation: any, jobTicketId: string, linkedWorkOrd
 
 const mapBatchToWorkOrder = (batch: any, workOrderId: string) => {
   const classes = Array.isArray(batch.classes) ? batch.classes : [];
+  const batchReference = resolveBatchReference(batch);
   const totalLearners = classes.reduce((sum: number, cls: any) => {
     const learners = toSafeNumber(cls.learners ?? cls.student_count ?? cls.number_of_learners, 0);
     return sum + learners;
@@ -195,15 +203,16 @@ const mapBatchToWorkOrder = (batch: any, workOrderId: string) => {
     customerId: batch.school_id || batch.customer_id || undefined,
     customerName: batch.school_name || batch.customer_name || batch.name,
     productId: batch.id,
-    productName: batch.name,
+    productName: batchReference,
     quantityPlanned: Math.max(1, totalLearners || classes.length),
     quantityCompleted: 0,
     dueDate: batch.examination_date || batch.due_date || nowIso(),
     startDate: nowIso(),
     priority: batch.priority || 'Normal',
-    notes: `Generated from examination batch ${batch.id}`,
+    notes: `Generated from examination batch ${batchReference}`,
     logs: [],
     examinationMeta: {
+      batchNumber: batchReference,
       academicYear: batch.academic_year,
       term: batch.term,
       examType: batch.exam_type,
@@ -221,6 +230,7 @@ const mapBatchToWorkOrder = (batch: any, workOrderId: string) => {
 
 const mapBatchToTicket = (batch: any, jobTicketId: string, linkedWorkOrderId?: string): JobTicket => {
   const classes = Array.isArray(batch.classes) ? batch.classes : [];
+  const batchReference = resolveBatchReference(batch);
   const totalLearners = classes.reduce((sum: number, cls: any) => {
     const learners = toSafeNumber(cls.learners ?? cls.student_count ?? cls.number_of_learners, 0);
     return sum + learners;
@@ -236,7 +246,7 @@ const mapBatchToTicket = (batch: any, jobTicketId: string, linkedWorkOrderId?: s
     customerName: batch.school_name || batch.customer_name || batch.name,
     customerPhone: batch.school_phone || batch.customer_phone || undefined,
     customerEmail: batch.school_email || batch.customer_email || undefined,
-    description: `Examination batch ${batch.name}`,
+    description: `Examination batch ${batchReference}`,
     quantity: Math.max(1, totalLearners || classes.length),
     priority: 'Normal',
     status: 'Received',
@@ -254,7 +264,7 @@ const mapBatchToTicket = (batch: any, jobTicketId: string, linkedWorkOrderId?: s
     dateReceived: nowIso(),
     dueDate: batch.examination_date || batch.due_date || undefined,
     progressPercent: 0,
-    notes: `Converted from examination batch ${batch.id}`,
+    notes: `Converted from examination batch ${batchReference}`,
     sourceType: 'examination_batch',
     sourceId: batch.id,
     linkedWorkOrderId,
@@ -377,7 +387,7 @@ const convertExaminationBatchToJobTicket = async (batchId: string, options: Conv
   const requestedBy = toSafeString(options.requestedBy) || 'system';
   const requesterRole = toSafeString(options.requesterRole) || 'System';
   const force = Boolean(options.force);
-  const hydratedBatchPromise = examinationBatchService.getBatch(batchId).catch(() => null);
+  const hydratedBatch = await examinationBatchService.getBatch(batchId).catch(() => null);
 
   const conversion = await dbService.executeAtomicOperation(
     ['examinationBatches', 'jobTickets', 'workOrders', 'auditLogs', 'idempotencyKeys'],
@@ -389,11 +399,11 @@ const convertExaminationBatchToJobTicket = async (batchId: string, options: Conv
       const idempotencyStore = tx.objectStore('idempotencyKeys');
 
       const storedBatch = await batchStore.get(batchId);
-      const hydratedBatch = await hydratedBatchPromise;
       const batch = mergeBatchSnapshot(storedBatch, hydratedBatch);
       if (!batch) {
         throw new Error('Examination batch not found');
       }
+      const batchReference = resolveBatchReference(batch);
 
       const validationErrors = validateBatchForConversion(batch);
       if (!force && validationErrors.length > 0) {
@@ -439,7 +449,7 @@ const convertExaminationBatchToJobTicket = async (batchId: string, options: Conv
         jobTicketId,
         requestedBy,
         requesterRole,
-        details: `Examination batch ${batchId} converted to job ticket ${jobTicketId} and work order ${workOrderId}`
+        details: `Examination batch ${batchReference} converted to job ticket ${jobTicketId} and work order ${workOrderId}`
       });
       await auditLogStore.put(auditEntry);
 

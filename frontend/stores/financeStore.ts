@@ -4,6 +4,7 @@ import { Account, LedgerEntry, Invoice, Expense, RecurringInvoice, ScheduledPaym
 import { api } from '../services/api';
 import { dbService } from '../services/db';
 import { transactionService } from '../services/transactionService';
+import { generateNextSalesInvoiceNumber } from '../services/documentNumberService';
 import { DEFAULT_ACCOUNTS } from '../constants';
 import { generateNextId } from '../utils/helpers';
 
@@ -33,7 +34,7 @@ interface FinanceState {
   updateAccount: (account: Account) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
   
-  addInvoice: (invoice: Invoice) => Promise<void>;
+  addInvoice: (invoice: Invoice) => Promise<string>;
   updateInvoice: (invoice: Invoice) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
   
@@ -183,9 +184,13 @@ export const useFinanceStore = create<FinanceState>((set, get) => ({
   },
 
   addInvoice: async (invoice) => {
-      const newInvoice = { ...invoice, id: invoice.id || generateNextId('INV', get().invoices) };
+      const newInvoice = {
+        ...invoice,
+        id: String(invoice.id || '').trim() || await generateNextSalesInvoiceNumber()
+      };
       set(state => ({ invoices: [newInvoice, ...state.invoices] }));
       await api.finance.saveInvoice(newInvoice);
+      return newInvoice.id;
   },
   updateInvoice: async (invoice) => {
       set(state => ({ invoices: state.invoices.map(i => i.id === invoice.id ? invoice : i) }));

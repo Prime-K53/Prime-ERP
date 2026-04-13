@@ -642,6 +642,7 @@ const ExaminationHub: React.FC = () => {
                   {filteredBatches.map((batch) => {
                     const statusConfig = getStatusConfig(batch.status);
                     const schoolName = getSchoolName(String(batch.school_id));
+                    const batchReference = String(batch.batch_number || batch.batchNumber || batch.id || '').trim();
                     return (
                       <tr
                         key={batch.id}
@@ -662,6 +663,9 @@ const ExaminationHub: React.FC = () => {
                         </td>
                         <td className="table-body-cell">
                           <div className="font-semibold text-slate-900">{batch.name}</div>
+                          {batchReference && (
+                            <div className="text-[11px] font-mono text-slate-500 mt-0.5">{batchReference}</div>
+                          )}
                           {batch.type === 'Patch' && (
                             <span className="inline-flex items-center rounded-lg px-2 py-0.5 text-[10px] font-semibold bg-orange-50 text-orange-700 border border-orange-100 mt-1">
                               Patch

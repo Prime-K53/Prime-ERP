@@ -8,6 +8,7 @@ import { useAuth } from './AuthContext';
 import { transactionService } from '../services/transactionService';
 import { dbService } from '../services/db';
 import { roundFinancial, generateNextId, formatNumber } from '../utils/helpers';
+import { generateNextSalesInvoiceNumber } from '../services/documentNumberService';
 import { isBefore, isWithinInterval, parseISO } from 'date-fns';
 import { logger } from '../services/logger';
 import { workflowService } from '../services/workflowService';
@@ -36,7 +37,7 @@ interface FinanceContextType {
   updateAccount: (account: Account) => void;
   deleteAccount: (id: string) => void;
   
-  addInvoice: (invoice: Invoice) => Promise<void>;
+  addInvoice: (invoice: Invoice) => Promise<string>;
   updateInvoice: (invoice: Invoice) => void;
   deleteInvoice: (id: string) => Promise<void>; 
   
@@ -391,8 +392,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const addInvoice = async (invoice: Invoice) => {
       try {
+        const invoiceId = String(invoice.id || '').trim() || await generateNextSalesInvoiceNumber(companyConfig);
+        const finalizedInvoice: Invoice = {
+          ...invoice,
+          id: invoiceId
+        };
+
         // Use transactionService for atomic Invoice + Inventory + Ledger
-        await transactionService.processInvoice(invoice);
+        await transactionService.processInvoice(finalizedInvoice);
         
         // Refresh finance data to reflect changes
         await financeStore.fetchFinanceData();
@@ -401,33 +408,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addAuditLog({
             action: 'CREATE',
             entityType: 'Invoice',
-            entityId: invoice.id,
-            details: `Created invoice for ${invoice.customerName}. Amount: ${companyConfig?.currencySymbol || ''}${invoice.totalAmount}`,
-            newValue: invoice
+            entityId: invoiceId,
+            details: `Created invoice for ${finalizedInvoice.customerName}. Amount: ${companyConfig?.currencySymbol || ''}${finalizedInvoice.totalAmount}`,
+            newValue: finalizedInvoice
         });
         
-        notify(`Invoice #${invoice.id} processed successfully`, "success");
+        notify(`Invoice #${invoiceId} processed successfully`, "success");
 
         // Trigger Customer Notification (Exclude POS if possible)
-        const isPosInvoice = invoice.notes?.includes('POS') || (invoice as any).sourceType === 'POS' || (invoice as any).reference?.includes('POS');
+        const isPosInvoice = finalizedInvoice.notes?.includes('POS') || (finalizedInvoice as any).sourceType === 'POS' || (finalizedInvoice as any).reference?.includes('POS');
         if (!isPosInvoice) {
-            const customer = salesStore.customers.find(c => c.name === invoice.customerName || c.id === invoice.customerId);
+            const customer = salesStore.customers.find(c => c.name === finalizedInvoice.customerName || c.id === finalizedInvoice.customerId);
             if (customer?.phone) {
                 const isExaminationInvoice =
-                    String((invoice as any).originModule || (invoice as any).origin_module || '').toLowerCase() === 'examination'
-                    || String((invoice as any).documentTitle || '').toLowerCase().includes('examination invoice')
-                    || String((invoice as any).documentTitle || '').toLowerCase().includes('service invoice')
-                    || String((invoice as any).reference || '').toUpperCase().startsWith('EXM-BATCH-');
+                    String((finalizedInvoice as any).originModule || (finalizedInvoice as any).origin_module || '').toLowerCase() === 'examination'
+                    || String((finalizedInvoice as any).documentTitle || '').toLowerCase().includes('examination invoice')
+                    || String((finalizedInvoice as any).documentTitle || '').toLowerCase().includes('service invoice')
+                    || String((finalizedInvoice as any).reference || '').toUpperCase().startsWith('EXM-BATCH-');
 
                 await customerNotificationService.triggerNotification(isExaminationInvoice ? 'EXAMINATION_INVOICE' : 'INVOICE', {
-                    id: invoice.id,
-                    customerName: invoice.customerName,
+                    id: invoiceId,
+                    customerName: finalizedInvoice.customerName,
                     phoneNumber: customer.phone,
-                    amount: `${companyConfig?.currencySymbol || ''}${invoice.totalAmount.toLocaleString()}`,
-                    dueDate: new Date(invoice.dueDate).toLocaleDateString()
+                    amount: `${companyConfig?.currencySymbol || ''}${finalizedInvoice.totalAmount.toLocaleString()}`,
+                    dueDate: new Date(finalizedInvoice.dueDate).toLocaleDateString()
                 });
             }
         }
+        return invoiceId;
       } catch (err: any) {
         notify(`Invoice Processing Error: ${err.message}`, "error");
         throw err;

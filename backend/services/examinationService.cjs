@@ -2807,27 +2807,66 @@ const examinationService = {
     const parentBatchCandidate = payload.parent_batch_id ?? payload.parentBatchId;
     const currencyCandidate = payload.currency;
     const subAccountCandidate = payload.sub_account_name ?? payload.subAccountName;
+    const batchNumberCandidate = payload.batch_number ?? payload.batchNumber;
     const initialRoundingConfig = resolveBatchRoundingConfig(null, payload);
+    const ensureUniqueBatchNumber = async (candidate) => {
+      const normalizedCandidate = String(candidate || '').trim();
+      if (!normalizedCandidate) return normalizedCandidate;
+
+      const duplicate = await runGet(
+        'SELECT batch_number FROM examination_batches WHERE batch_number = ?',
+        [normalizedCandidate]
+      );
+      if (!duplicate) {
+        return normalizedCandidate;
+      }
+
+      const parts = normalizedCandidate.match(/^(.*?)(\d+)([^0-9]*)$/);
+      if (!parts) {
+        throw new Error(`Batch number "${normalizedCandidate}" already exists.`);
+      }
+
+      const [, prefix, numericPart, suffix] = parts;
+      const existingRows = await runQuery(
+        'SELECT batch_number FROM examination_batches WHERE batch_number LIKE ?',
+        [`${prefix}%`]
+      );
+
+      const highestUsedNumber = (existingRows || []).reduce((max, row) => {
+        const currentValue = String(row?.batch_number || '').trim();
+        const currentParts = currentValue.match(/^(.*?)(\d+)([^0-9]*)$/);
+        if (!currentParts) return max;
+        if (currentParts[1] !== prefix || currentParts[3] !== suffix) return max;
+        const numericValue = parseInt(currentParts[2], 10);
+        return Number.isFinite(numericValue) ? Math.max(max, numericValue) : max;
+      }, parseInt(numericPart, 10) || 0);
+
+      return `${prefix}${String(highestUsedNumber + 1).padStart(numericPart.length, '0')}${suffix}`;
+    };
 
     if (!schoolIdCandidate || !nameCandidate || !String(nameCandidate).trim()) {
       throw new Error('School ID and batch name are required fields');
     }
 
-    const currentYear = new Date().getFullYear().toString();
-    const batchYearPrefix = `BTC-PPS-${currentYear}-`;
-    const lastBatchRow = await runQuery(
-      `SELECT batch_number FROM examination_batches WHERE batch_number LIKE ? ORDER BY batch_number DESC LIMIT 1`,
-      [`${batchYearPrefix}%`]
-    );
-    let nextNum = 1;
-    if (lastBatchRow && lastBatchRow.length > 0 && lastBatchRow[0].batch_number) {
-      const parts = lastBatchRow[0].batch_number.split('-');
-      const lastSeq = parseInt(parts[3], 10);
-      if (!isNaN(lastSeq)) {
-        nextNum = lastSeq + 1;
+    let batchNumber = String(batchNumberCandidate || '').trim();
+    if (!batchNumber) {
+      const currentYear = new Date().getFullYear().toString();
+      const batchYearPrefix = `BTC-PPS-${currentYear}-`;
+      const lastBatchRow = await runQuery(
+        `SELECT batch_number FROM examination_batches WHERE batch_number LIKE ? ORDER BY batch_number DESC LIMIT 1`,
+        [`${batchYearPrefix}%`]
+      );
+      let nextNum = 1;
+      if (lastBatchRow && lastBatchRow.length > 0 && lastBatchRow[0].batch_number) {
+        const parts = lastBatchRow[0].batch_number.split('-');
+        const lastSeq = parseInt(parts[3], 10);
+        if (!isNaN(lastSeq)) {
+          nextNum = lastSeq + 1;
+        }
       }
+      batchNumber = `${batchYearPrefix}${String(nextNum).padStart(3, '0')}`;
     }
-    const batchNumber = `${batchYearPrefix}${String(nextNum).padStart(3, '0')}`;
+    batchNumber = await ensureUniqueBatchNumber(batchNumber);
 
     const normalizedPayload = {
       id,
