@@ -77,10 +77,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         return Math.max(0, total - typedAmount);
     }, [splitPayments.length, remainingDue, total, typedAmount]);
 
-    const canCompleteSale = useMemo(() => {
-        if (splitPayments.length > 0) return effectiveRemainingDue <= 0.01;
-        return typedAmount >= total - 0.01;
-    }, [splitPayments.length, effectiveRemainingDue, typedAmount, total]);
+const canCompleteSale = useMemo(() => {
+  // total paid is sum of split payments plus any typed amount remaining
+  const totalPaid = splitPayments.reduce((sum, p) => sum + p.amount, 0) + typedAmount;
+  // consider the sale complete if totalPaid covers the total within a small tolerance
+  return totalPaid >= total - 0.01;
+}, [splitPayments, typedAmount, total]);
 
     const handleComplete = useCallback(() => {
         const paymentsToSubmit: PaymentDetail[] = splitPayments.length > 0

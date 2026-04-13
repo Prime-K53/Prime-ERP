@@ -300,12 +300,13 @@ const ExaminationHub: React.FC = () => {
     setSelectedBatchIds(new Set());
   };
 
-  const handleBatchRowClick = (event: React.MouseEvent<HTMLElement>, batchId: string) => {
+  const handleBatchRowClick = (event: React.MouseEvent<HTMLElement>, batch: any) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest('button, input, a, [data-row-action="true"]')) {
       return;
     }
-    navigate(`/examination/batches/${batchId}`);
+    const batchRef = String(batch.batch_number || batch.batchNumber || batch.id || '').trim();
+    navigate(`/examination/batches/${batch.id}`, { state: { name: batchRef } });
   };
 
   const handleBulkDelete = async () => {
@@ -647,7 +648,7 @@ const ExaminationHub: React.FC = () => {
                       <tr
                         key={batch.id}
                         className="hover:bg-blue-50/50 transition-colors cursor-pointer"
-                        onClick={(event) => handleBatchRowClick(event, batch.id)}
+                        onClick={(event) => handleBatchRowClick(event, batch)}
                         onContextMenu={(e) => {
                           e.preventDefault();
                           setOpenMenuId(batch.id);
@@ -713,7 +714,10 @@ const ExaminationHub: React.FC = () => {
                                 {/* View/Edit - Available for all statuses */}
                                 <button
                                   type="button"
-                                  onClick={() => navigate(`/examination/batches/${batch.id}`)}
+                                  onClick={() => {
+                                    const batchRef = String(batch.batch_number || batch.batchNumber || batch.id || '').trim();
+                                    navigate(`/examination/batches/${batch.id}`, { state: { name: batchRef } });
+                                  }}
                                   className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                                 >
                                   <Edit3 size={14} className="text-slate-500" />

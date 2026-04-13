@@ -1,5 +1,4 @@
 
-import { generateAIResponse } from './geminiService';
 import { dbService } from './db';
 import { CompanyConfig, Customer } from '../types';
 
@@ -29,13 +28,13 @@ const getCompanyConfig = (): CompanyConfig | null => {
 };
 
 const DEFAULT_TEMPLATES: Record<NotificationActivityType, string> = {
-  QUOTATION: "Hello {customerName}, your quotation {id} for {amount} is ready. Thank you for choosing {companyName}!",
-  SALES_ORDER: "Hello {customerName}, your sales order {id} for {amount} has been created. Thank you for choosing {companyName}!",
-  INVOICE: "Hello {customerName}, your invoice {id} for {amount} has been generated. Due date: {dueDate}. Regards, {companyName}.",
-  EXAMINATION_INVOICE: "Hello {customerName}, your service invoice {id} for {amount} has been generated. Due date: {dueDate}. Regards, {companyName}.",
-  EXAM_BATCH: "Hello {customerName}, your examination batch {id} has been approved. Total candidates: {count}. {companyName}.",
-  PAYMENT: "Hello {customerName}, we have received your payment of {amount} for {id}. Thank you for your business! {companyName}.",
-  RECEIPT: "Hello {customerName}, your receipt {id} for {amount} has been issued. Thank you for your business! {companyName}."
+  QUOTATION: "Hi {customerName}! 📄 Great news! Your quotation #{id} for {amount} is ready at {companyName}. We can't wait to serve you! Review it today and let us know if you have any questions. We're here to help you succeed! 🌟",
+  SALES_ORDER: "Hi {customerName}! 🛍️ Awesome! Your sales order #{id} for {amount} has been confirmed at {companyName}. Our team is already working on preparing your items with care and precision. We'll notify you as soon as they're ready. Thank you for trusting us with your needs! 🚚✨",
+  INVOICE: "Hi {customerName}! 🧾 Your invoice #{id} for {amount} from {companyName} is now due on {dueDate}. We appreciate your prompt attention to this matter. Paying on time helps us continue delivering the excellent service you deserve. Need assistance? We're just a message away! 💳🙂",
+  EXAMINATION_INVOICE: "Hi {customerName}! 📝 Your service invoice #{id} for {amount} from {companyName} is now due on {dueDate}. Thank you for choosing us for your examination needs. Complete your payment today and let's continue building success together! 🎓💪",
+  EXAM_BATCH: "Hi {customerName}! ✅ Exciting news! Your examination batch #{id} has been approved at {companyName} with {count} candidates. We're committed to making this process smooth and successful for you. Get ready for outstanding results! Let's achieve greatness together! 🎉🏆",
+  PAYMENT: "Hi {customerName}! 💰 Thank you! We've received your payment of {amount} for {id} at {companyName}. Your trust means the world to us! We're already preparing to exceed your expectations on your next visit. See you soon! 🙏❤️",
+  RECEIPT: "Hi {customerName}! 🧾 Your receipt #{id} for {amount} has been issued by {companyName}. Thank you for your continued support! We value you as a cherished customer and look forward to serving you again. Remember - your satisfaction is our greatest reward! ⭐🌈"
 };
 
 const ACTIVITY_LABELS: Record<NotificationActivityType, string> = {
@@ -49,33 +48,15 @@ const ACTIVITY_LABELS: Record<NotificationActivityType, string> = {
 };
 
 /**
- * AI-powered template generator
+ * Template-based message generator (no AI)
  */
-const generateDynamicTemplate = async (
+const generateMessageFromTemplate = (
   type: NotificationActivityType,
   data: any,
   config: CompanyConfig
-): Promise<string> => {
-  if (!navigator.onLine) {
-    return replacePlaceholders(DEFAULT_TEMPLATES[type], data, config);
-  }
-
-  const prompt = `Generate a professional, appreciative, and business-encouraging SMS/WhatsApp message for a customer.
-  Activity: ${type}
-  Customer: ${data.customerName}
-  Details: ${JSON.stringify(data)}
-  Company: ${config.companyName}
-  Tone: Professional, Friendly, Concise.
-  Max length: 160 characters.
-  Return ONLY the message text.`;
-
-  try {
-    const aiMessage = await generateAIResponse(prompt, "You are a professional customer relations assistant.");
-    return aiMessage.trim() || replacePlaceholders(DEFAULT_TEMPLATES[type], data, config);
-  } catch (error) {
-    console.error("AI template generation failed:", error);
-    return replacePlaceholders(DEFAULT_TEMPLATES[type], data, config);
-  }
+): string => {
+  const template = DEFAULT_TEMPLATES[type] || "Hi {customerName}! Thank you for choosing {companyName}!";
+  return replacePlaceholders(template, data, config);
 };
 
 const replacePlaceholders = (template: string, data: any, config: CompanyConfig): string => {
@@ -143,7 +124,7 @@ export const customerNotificationService = {
       return;
     }
 
-    const message = await generateDynamicTemplate(type, data, config);
+    const message = generateMessageFromTemplate(type, data, config);
 
     const logEntryBase: Omit<NotificationLog, 'status'> = {
       id: `NOTIF-LOG-${Date.now()}`,

@@ -96,16 +96,16 @@ export const JobOrderDetails: React.FC<JobOrderDetailsProps> = ({ jobOrder, onCl
     const totalInternalCost = (jobOrder.laborCost || 0) + (jobOrder.overheadCost || 0) + (jobOrder.materialCost || 0);
 
     return (
-        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white w-full max-w-5xl h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-start">
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200/60 font-sans text-[13px] leading-relaxed text-slate-800">
+                <div className="px-[16px] py-[12px] border-b border-slate-100 bg-slate-50/50 flex justify-between items-start shrink-0">
                     <div>
                         <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight leading-tight">Job Order #{jobOrder.id}</h1>
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-blue-100 text-blue-700`}>{jobOrder.status}</span>
+                            <h1 className="text-[22px] font-semibold text-slate-800 tracking-tight">Job Order #{jobOrder.id}</h1>
+                            <span className={`px-2.5 py-0.5 rounded-lg text-[12.5px] font-semibold tracking-wide bg-blue-100 text-blue-700`}>{jobOrder.status}</span>
                         </div>
-                        <div className="text-slate-500 text-sm flex items-center gap-4">
-                            <span className="font-bold text-slate-700">{jobOrder.customerName}</span>
+                        <div className="flex items-center gap-4 text-[12.5px] font-medium text-slate-500 tracking-wide">
+                            <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold">{jobOrder.customerName}</span>
                         </div>
                     </div>
                     <div className="flex gap-2">

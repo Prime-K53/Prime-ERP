@@ -107,12 +107,42 @@ const AI_TEMPLATES = [
     description: 'Recover abandoned shopping carts',
     content: "Hi [Customer Name]! 🛒 You left something behind at [Company Name]! Your [Product(s)] are still in your cart. Complete your purchase today and enjoy [Special Offer]! Valid for [Time Period]. 😊"
   },
-  {
-    id: 'referral',
-    name: 'Referral Program',
-    description: 'Invite customers to refer friends',
-    content: "Hi [Customer Name]! 🤝 Love [Company Name]? Share the goodness! Refer a friend and you'll both get [Reward] when they make their first purchase. Send them your unique link: [Referral Link]. Let's grow together! 🎉"
-  }
+    {
+      id: 'referral',
+      name: 'Referral Program',
+      description: 'Invite customers to refer friends',
+      content: "Hi [Customer Name]! 🤝 Love [Company Name]? Share the goodness! Refer a friend and you'll both get [Reward] when they make their first purchase. Send them your unique link: [Referral Link]. Let's grow together! 🎉"
+    },
+    {
+      id: 'promotion',
+      name: 'General Promotion',
+      description: 'A generic promotional message for discounts or events',
+      content: "Hi [Customer Name]! 🎈 Don't miss our latest promotion at [Company Name] – enjoy [Discount]% off on selected items. Visit us today and save! 🚀"
+    },
+    {
+      id: 'top_customer',
+      name: 'Top Customer Appreciation',
+      description: 'Reward your best customers with a special offer',
+      content: "Hello [Customer Name]! 🌟 As one of our top customers, we’re delighted to give you an exclusive [Discount]% discount on your next purchase at [Company Name]. Thank you for your loyalty! 🎉"
+    },
+    {
+      id: 'year_end_offer',
+      name: 'Year-End Offer',
+      description: 'Seasonal year‑end discount promotion',
+      content: "Hi [Customer Name]! 🎉 Celebrate the end of the year with an exclusive [Discount]% off on all products at [Company Name]. Use code YEAREND2026 at checkout. Offer valid until Dec 31. Happy Holidays! 🎁"
+    },
+    {
+      id: 'special_offer',
+      name: 'Special Offer',
+      description: 'A limited‑time special deal',
+      content: "Hi [Customer Name]! 🎁 We're offering a special deal just for you: [Offer Detail] at [Company Name]. Grab it before it’s gone! 🕒"
+    },
+    {
+      id: 'new_arrival',
+      name: 'New Arrival Announcement',
+      description: 'Announce a brand‑new product',
+      content: "Hi [Customer Name]! 🌟 New arrivals are in at [Company Name]: [Product Name]. Explore now and enjoy an introductory [Discount]% off! 🎉"
+    }
 ];
 
 interface WhatsAppMarketingModalProps {

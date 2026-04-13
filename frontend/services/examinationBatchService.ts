@@ -622,6 +622,8 @@ export const examinationBatchService = {
   },
 
   async getBatch(id: string): Promise<ExaminationBatch> {
+    console.log('[DEBUG] examinationBatchService.getBatch - Fetching batch:', { id, isLocal: isLocalBatchId(id) });
+    
     if (isLocalBatchId(id)) {
       const local = await getLocalBatches();
       const fallback = local.find(batch => String(batch.id) === String(id));
@@ -633,13 +635,22 @@ export const examinationBatchService = {
       const response = await fetchWithTimeout(`/batches/${id}`, {
         headers: getHeaders()
       }, REQUEST_TIMEOUT_MS);
-      if (!response.ok) throw new Error(await toServiceError(response, 'Failed to fetch batch'));
+      if (!response.ok) {
+        const errorMsg = await toServiceError(response, 'Failed to fetch batch');
+        console.error('[DEBUG] examinationBatchService.getBatch - API Error:', {
+          id,
+          status: response.status,
+          error: errorMsg
+        });
+        throw new Error(errorMsg);
+      }
       const data = await safeJson(response, 'getBatch');
       await storeLocalBatch({
         ...data,
         _syncStatus: 'synced',
         _lastSyncedAt: toIso()
       });
+      console.log('[DEBUG] examinationBatchService.getBatch - Success:', { id, batchNumber: data.batch_number });
       return data;
     } catch (error) {
       if (isOfflineError(error)) {
@@ -648,6 +659,7 @@ export const examinationBatchService = {
         const fallback = local.find(batch => String(batch.id) === String(id));
         if (fallback) return fallback as ExaminationBatch;
       }
+      console.error('[DEBUG] examinationBatchService.getBatch - Error:', { id, error });
       throw error;
     }
   },
@@ -668,6 +680,22 @@ export const examinationBatchService = {
     try {
       const result = await createBatchRemote(payloadWithBatchNumber);
       console.log('[DEBUG] examinationBatchService.createBatch - Success result:', result);
+      
+      // Verify batch was actually created
+      const batchId = result?.id || result?.batchId;
+      if (batchId) {
+        try {
+          const verifyResponse = await fetchWithTimeout(`/batches/${batchId}`, { headers: getHeaders() }, REQUEST_TIMEOUT_MS);
+          if (!verifyResponse.ok) {
+            console.error('[DEBUG] examinationBatchService.createBatch - Verification failed! Batch not found after creation:', { batchId, status: verifyResponse.status });
+          } else {
+            console.log('[DEBUG] examinationBatchService.createBatch - Verified batch exists:', { batchId });
+          }
+        } catch (verifyError) {
+          console.error('[DEBUG] examinationBatchService.createBatch - Verification error:', verifyError);
+        }
+      }
+      
       await storeLocalBatch({
         ...result,
         _syncStatus: 'synced',
@@ -1056,6 +1084,26 @@ export const examinationBatchService = {
   },
 
   // Class methods
+  async getBatchByNumber(batchNumber: string): Promise<ExaminationBatch | null> {
+    try {
+      const response = await fetchWithTimeout(`/batches?batch_number=${encodeURIComponent(batchNumber)}`, {
+        headers: getHeaders()
+      }, REQUEST_TIMEOUT_MS);
+      if (!response.ok) return null;
+      const data = await safeJson(response, 'getBatchByNumber');
+      return data?.batches?.[0] || data?.[0] || null;
+    } catch {
+      return null;
+    }
+  },
+
+  async findBatchByNumber(batchNumber: string): Promise<ExaminationBatch | null> {
+    const local = await getLocalBatches();
+    const found = local.find(b => b.batch_number === batchNumber || b.batchNumber === batchNumber);
+    if (found) return found as ExaminationBatch;
+    return this.getBatchByNumber(batchNumber);
+  },
+
   async addClass(batchId: string, payload: Partial<ExaminationClass>): Promise<ExaminationClass> {
     // Validate required fields
     if (!batchId || !batchId.trim()) {
@@ -1071,13 +1119,71 @@ export const examinationBatchService = {
       throw new Error('Number of learners must be greater than 0');
     }
 
+    // Fallback: if batch not found, try to find by batch number or re-create
+    let actualBatchId = batchId;
+    if (!isLocalBatchId(batchId)) {
+      try {
+        const testResponse = await fetchWithTimeout(`/batches/${batchId}`, {
+          headers: getHeaders()
+        }, 5000);
+        if (!testResponse.ok && testResponse.status === 404) {
+          const localBatch = (await getLocalBatches()).find(b => String(b.id) === String(batchId));
+          if (localBatch?.batch_number) {
+            console.log('[DEBUG] examinationBatchService.addClass - Batch ID not found, trying batch number lookup:', { batchId, batchNumber: localBatch.batch_number });
+            const foundByNumber = await this.getBatchByNumber(localBatch.batch_number);
+            if (foundByNumber?.id) {
+              actualBatchId = String(foundByNumber.id);
+              console.log('[DEBUG] examinationBatchService.addClass - Found batch by number:', { oldBatchId: batchId, newBatchId: actualBatchId });
+            } else {
+              console.log('[DEBUG] examinationBatchService.addClass - Batch not in backend either, attempting to re-create:', { batchId, batchNumber: localBatch.batch_number });
+              try {
+                const recreated = await this.createBatch({
+                  ...localBatch,
+                  batch_number: localBatch.batch_number,
+                  status: localBatch.status || 'Draft'
+                });
+                actualBatchId = String(recreated.id);
+                console.log('[DEBUG] examinationBatchService.addClass - Re-created batch:', { oldBatchId: batchId, newBatchId: actualBatchId });
+              } catch (recreateError) {
+                console.error('[DEBUG] examinationBatchService.addClass - Failed to re-create batch:', recreateError);
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    console.log('[DEBUG] examinationBatchService.addClass - Request details:', {
+      batchId: actualBatchId,
+      originalBatchId: batchId,
+      className: payload.class_name,
+      numberOfLearners: payload.number_of_learners,
+      requestPath: '/classes',
+      isLocalBatchId: isLocalBatchId(actualBatchId)
+    });
+
     const response = await fetchWithTimeout('/classes', {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ ...payload, batch_id: batchId }),
+      body: JSON.stringify({ ...payload, batch_id: actualBatchId }),
     }, HEAVY_REQUEST_TIMEOUT_MS);
-    if (!response.ok) throw new Error(await toServiceError(response, 'Failed to add class'));
-    return safeJson(response, 'addClass');
+    
+    if (!response.ok) {
+      const errorText = await toServiceError(response, 'Failed to add class');
+      console.error('[DEBUG] examinationBatchService.addClass - API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+        batchId: actualBatchId,
+        originalBatchId: batchId,
+        isLocalBatch: isLocalBatchId(actualBatchId)
+      });
+      throw new Error(errorText);
+    }
+    
+    const result = await safeJson(response, 'addClass');
+    console.log('[DEBUG] examinationBatchService.addClass - Success:', result);
+    return result;
   },
 
   async updateClass(classId: string, payload: Partial<ExaminationClass>): Promise<ExaminationClass> {

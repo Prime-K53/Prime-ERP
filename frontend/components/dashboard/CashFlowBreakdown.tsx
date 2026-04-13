@@ -129,12 +129,10 @@ const FULL_WIDTH_STYLE: React.CSSProperties = {
 // ============================================================
 const formatCurrency = (amount: number, currency: string): string => {
   const absAmount = Math.abs(amount);
-  const formatted = absAmount.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const thousands = absAmount / 1000;
+  const formatted = thousands.toFixed(0);
   const sign = amount < 0 ? '-' : '';
-  return `${sign}${currency}${formatted}`;
+  return `${sign}${currency}${formatted}k`;
 };
 
 const formatPercent = (value: number): string => {

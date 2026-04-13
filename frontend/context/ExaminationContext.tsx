@@ -330,9 +330,20 @@ export const ExaminationProvider: React.FC<ExaminationProviderProps> = ({ childr
    */
   const sendBatchToProduction = useCallback(async (batch: ExaminationBatch) => {
     try {
-      // Get school name
-      const school = schools.find(s => String(s.id) === String(batch.school_id));
-      const schoolName = school?.name || 'Unknown School';
+      // Get school name - first try from schools, then fallback to customers
+      let school = schools.find(s => String(s.id) === String(batch.school_id));
+      let schoolName = school?.name;
+      
+      // If no school found, try to find the customer directly
+      if (!schoolName) {
+        const customer = customers.find(c => String(c.id) === String(batch.school_id));
+        schoolName = customer?.name || 'Unknown School';
+      }
+      
+      // Final fallback
+      if (!schoolName) {
+        schoolName = 'Unknown School';
+      }
 
       // Extract subjects from batch classes
       const subjects: BatchToProductionPayload['subjects'] = [];

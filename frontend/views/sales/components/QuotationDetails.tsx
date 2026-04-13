@@ -37,30 +37,30 @@ export const QuotationDetails: React.FC<QuotationDetailsProps> = ({ quotation: i
   const isExaminationQuotation = String((quotation as any).quotationType || '').toLowerCase() === 'examination';
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-slate-50 w-full max-w-5xl h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+    <div className="fixed inset-0 z-[70] bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-[1.5rem] shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200/60 font-sans text-[13px] leading-relaxed text-slate-800">
         {/* Header */}
-        <div className="p-8 border-b border-slate-200 bg-white flex justify-between items-start shrink-0">
+        <div className="px-[16px] py-[12px] border-b border-slate-100 bg-slate-50/50 flex justify-between items-start shrink-0">
           <div className="flex gap-6 items-center">
             <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
               <FileText size={32} />
             </div>
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">Quotation #{quotation.id}</h1>
-                <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${quotation.status === 'Accepted' || quotation.status === 'Approved' || quotation.status === 'Converted' ? 'bg-emerald-100 text-emerald-700' :
+                <h1 className="text-[22px] font-semibold text-slate-800 tracking-tight">Quotation #{quotation.id}</h1>
+                <span className={`px-2.5 py-0.5 rounded-lg text-[12.5px] font-semibold tracking-wide ${quotation.status === 'Accepted' || quotation.status === 'Approved' || quotation.status === 'Converted' ? 'bg-emerald-100 text-emerald-700' :
                   quotation.status === 'Rejected' ? 'bg-rose-100 text-rose-700' :
                     isExpired ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
                   }`}>
                   {isExpired ? 'Expired' : quotation.status}
                 </span>
                 {isExaminationQuotation && (
-                  <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-violet-100 text-violet-700">
+                  <span className="px-2.5 py-0.5 rounded-lg text-[12.5px] font-semibold tracking-wide bg-violet-100 text-violet-700">
                     Examination
                   </span>
                 )}
               </div>
-              <div className="text-slate-500 text-sm flex items-center gap-4 font-medium">
+              <div className="flex items-center gap-4 text-[12.5px] font-medium text-slate-500 tracking-wide">
                 <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold">{quotation.customerName}</span>
                 <span className="flex items-center gap-1.5"><Clock size={14} /> Issued {new Date(quotation.date).toLocaleDateString()}</span>
                 {quotation.validUntil && (

@@ -133,7 +133,8 @@ const ExaminationBatchDetail: React.FC = () => {
         type: 'Patch',
         parent_batch_id: batch.id,
       });
-      navigate(`/examination/batches/${newBatch.id}`);
+      const batchRef = String(newBatch.batch_number || newBatch.batchNumber || newBatch.id || '').trim();
+      navigate(`/examination/batches/${newBatch.id}`, { state: { name: batchRef } });
     } catch (error) {
       console.error('Error creating patch:', error);
       alert('Failed to create patch.');
@@ -186,6 +187,14 @@ const ExaminationBatchDetail: React.FC = () => {
         throw new Error('Number of learners must be greater than 0');
       }
 
+      console.log('[DEBUG] handleAddClass - Adding class to batch:', {
+        batchId: batch.id,
+        batchNumber: batch.batch_number || batch.batchNumber,
+        batchName: batch.name,
+        className: data.class_name,
+        learnerCount: data.number_of_learners
+      });
+
       const createdClass = await examinationBatchService.addClass(batch.id, {
         ...data,
         currency: batch.currency
@@ -208,16 +217,45 @@ const ExaminationBatchDetail: React.FC = () => {
       void fetchBatch().catch((refreshError) => {
         console.warn('Class added, but batch refresh failed:', refreshError);
       });
-    } catch (error) {
+    } catch (error: any) {
       let errorMessage = 'Failed to add class';
+      let debugInfo = '';
+      
       if (error instanceof Error) {
         errorMessage = error.message || 'Failed to add class';
+        
+        // Add detailed debug information for batch not found errors
+        if (errorMessage.includes('not found') || errorMessage.includes('create the batch first')) {
+          debugInfo = `
+            
+            ──────────────────────────────
+            🔍 Debug Information:
+            • Batch ID: ${batch.id}
+            • Batch Number: ${batch.batch_number || batch.batchNumber || 'N/A'}
+            • Batch Name: ${batch.name}
+            • Batch Status: ${batch.status}
+            • Is Local ID: ${String(batch.id).startsWith('local-') ? 'Yes' : 'No'}
+            
+            Possible causes:
+            1. Backend server not running
+            2. Network/CORS issue
+            3. Batch not synced to backend yet
+            4. Wrong batch ID in URL (manual navigation?)
+          `;
+          
+          console.error('[DEBUG] Batch not found error details:', {
+            batchId: batch.id,
+            batchNumber: batch.batch_number,
+            errorMessage: error.message,
+            stack: error.stack
+          });
+        }
       } else if (typeof error === 'string') {
         errorMessage = error;
       }
 
       console.error('Error adding class:', error);
-      notify(errorMessage, 'error');
+      notify(errorMessage + debugInfo, 'error');
       throw new Error(errorMessage);
     }
   };
