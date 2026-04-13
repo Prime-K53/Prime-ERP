@@ -738,9 +738,9 @@ const handleQuickPrintConfirm = (quantity: number, pagesPerCopy: number, total: 
               <button onClick={handleQuickPhotocopy} className="text-blue-600 hover:underline flex items-center gap-1.5 text-sm font-semibold">
                 <Copy size={16} /> Photocopy
               </button>
-<button onClick={handleQuickTypePrinting} className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl active:scale-95 flex items-center gap-1.5 text-sm">
-  <FileText size={16} /> Type and Printing
-</button>
+              <button onClick={handleQuickTypePrinting} className="text-blue-600 hover:underline flex items-center gap-1.5 text-sm font-semibold">
+                <FileText size={16} /> Type and Printing
+              </button>
             </div>
           </div>
 
