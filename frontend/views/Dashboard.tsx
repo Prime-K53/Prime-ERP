@@ -1029,7 +1029,7 @@ const DashboardContent: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontSize: 11, color: '#64748b' }}>Amount due</div>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#b45309', backgroundColor: '#fffbeb', padding: '1px 8px', borderRadius: 6 }}>
-              {currency}{nextSubscription ? formatNumber(toSafeNumber(nextSubscription.totalAmount)) : '0'}
+              {formatShortCurrency(currency, toSafeNumber(nextSubscription?.totalAmount))}
             </div>
           </div>
         </div>
@@ -1751,7 +1751,7 @@ const DashboardContent: React.FC = () => {
                     letterSpacing: '-0.02em',
                     lineHeight: 1,
                   }}>
-                    {currency}{formatNumber(todaysCollection)}
+                    {formatShortCurrency(currency, todaysCollection)}
                   </div>
                 </KpiValueAnimator>
 
@@ -1850,7 +1850,7 @@ const DashboardContent: React.FC = () => {
                     letterSpacing: '-0.02em',
                     lineHeight: 1,
                   }}>
-                    {currency}{formatNumber(revenueThisMonth)}
+                    {formatShortCurrency(currency, revenueThisMonth)}
                   </div>
                 </KpiValueAnimator>
 
@@ -1881,7 +1881,7 @@ const DashboardContent: React.FC = () => {
                     })()}
                   </div>
                   <div style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>
-                    Goal: <span style={{ color: '#0f172a' }}>{currency}{formatNumber(companyConfig?.monthlyRevenueTarget || 50000)}</span>
+                    Goal: <span style={{ color: '#0f172a' }}>{formatShortCurrency(currency, companyConfig?.monthlyRevenueTarget || 50000)}</span>
                   </div>
                 </div>
 
@@ -1960,7 +1960,7 @@ const DashboardContent: React.FC = () => {
                     letterSpacing: '-0.02em',
                     lineHeight: 1,
                   }}>
-{currency}{formatNumber(receivables)}
+                    {formatShortCurrency(currency, receivables)}
                   </div>
                 </KpiValueAnimator>
 
@@ -1984,7 +1984,7 @@ const DashboardContent: React.FC = () => {
                       alignItems: 'center',
                       gap: 2,
                     }}>
-                      ↑ {currency}{formatNumber(receivables)}
+                      ↑ {formatShortCurrency(currency, receivables)}
                     </div>
                     <div style={{
                       fontSize: 10,
@@ -2009,7 +2009,7 @@ const DashboardContent: React.FC = () => {
                     {lastUnpaidInvoice ? (lastUnpaidInvoice.clientName || lastUnpaidInvoice.customerName) : 'No high debt'}
                   </div>
                   <div style={{ fontSize: 12, color: '#dc2626', fontWeight: 600 }}>
-                    {currency}{lastUnpaidInvoice ? formatNumber(toSafeNumber(lastUnpaidInvoice.totalAmount) - toSafeNumber(lastUnpaidInvoice.paidAmount)) : '0'}
+                    {formatShortCurrency(currency, lastUnpaidInvoice ? (toSafeNumber(lastUnpaidInvoice.totalAmount) - toSafeNumber(lastUnpaidInvoice.paidAmount)) : 0)}
                   </div>
                   <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>
                     {lastUnpaidInvoice ? format(new Date(lastUnpaidInvoice.date || lastUnpaidInvoice.createdAt), 'MMM d') : '—'}
