@@ -2,24 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useExamination } from '../../context/ExaminationContext';
 import { useAuth } from '../../context/AuthContext';
+import { useFinance } from '../../context/FinanceContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/Dialog';
 import { ArrowLeft, Save, Plus } from 'lucide-react';
 import { Customer } from '../../types';
 import { dbService } from '../../services/db';
 import { toast } from '../../components/Toast';
+import { format, addDays } from 'date-fns';
 
 const ExaminationBatchForm: React.FC = () => {
   const navigate = useNavigate();
   const { createBatch, loadAllData, customers, loading: contextLoading } = useExamination();
-  const { companyConfig, addAuditLog } = useAuth();
+  const { companyConfig = { currencySymbol: 'MWK', pricingSettings: { defaultMethod: 'ALWAYS_UP_50', customStep: 50 } } as any, addAuditLog } = useAuth();
+  const { accounts = [] } = useFinance() as any;
   const [loading, setLoading] = useState(false);
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const defaultValidUntil = format(addDays(new Date(), 30), 'yyyy-MM-dd');
   const [formData, setFormData] = useState({
     school_id: '',
-    name: '',
     academic_year: new Date().getFullYear().toString(),
     term: '1',
     exam_type: 'Mid-Term',
-    currency: companyConfig?.currencySymbol || 'MWK',
+    batch_date: today,
+    valid_until: defaultValidUntil,
+    sales_account_id: '',
     sub_account_name: ''
   });
 
@@ -111,7 +117,6 @@ const ExaminationBatchForm: React.FC = () => {
     event?.preventDefault();
 
     const schoolId = String(formData.school_id ?? '').trim();
-    const batchName = String(formData.name ?? '').trim();
     const academicYear = String(formData.academic_year ?? '').trim();
 
     if (!schoolId) {
@@ -120,10 +125,6 @@ const ExaminationBatchForm: React.FC = () => {
         return;
       }
       toast.error('Please select a school or customer from the list');
-      return;
-    }
-    if (!batchName) {
-      toast.error('Please enter a batch name');
       return;
     }
     if (!academicYear) {
@@ -136,7 +137,6 @@ const ExaminationBatchForm: React.FC = () => {
       const payload = {
         ...formData,
         school_id: schoolId,
-        name: batchName,
         academic_year: academicYear,
         sub_account_name: formData.sub_account_name.trim(),
         rounding_method: companyConfig?.pricingSettings?.defaultMethod || 'ALWAYS_UP_50',
@@ -243,22 +243,23 @@ const ExaminationBatchForm: React.FC = () => {
               </div>
             ) : (
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Currency</label>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Creation Date</label>
                 <input
-                  value={formData.currency}
-                  onChange={(event) => handleChange('currency', event.target.value)}
-                  disabled
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 outline-none"
+                  type="date"
+                  value={formData.batch_date}
+                  onChange={(event) => handleChange('batch_date', event.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
                 />
               </div>
             )}
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Batch Name</label>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5">Valid Until</label>
               <input
-                value={formData.name}
-                onChange={(event) => handleChange('name', event.target.value)}
-                placeholder="e.g. Term 1 Examinations 2026"
+                type="date"
+                value={formData.valid_until}
+                onChange={(event) => handleChange('valid_until', event.target.value)}
                 required
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
               />
@@ -304,7 +305,14 @@ const ExaminationBatchForm: React.FC = () => {
               </select>
             </div>
 
-
+            {/* Sales Account field - hidden but kept for functionality */}
+            <div className="hidden">
+              <input
+                type="hidden"
+                value={formData.sales_account_id}
+                onChange={(event) => handleChange('sales_account_id', event.target.value)}
+              />
+            </div>
           </div>
 
           <div className="flex justify-end pt-2">

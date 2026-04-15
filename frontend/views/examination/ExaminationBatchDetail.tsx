@@ -5,6 +5,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { useAuth } from '../../context/AuthContext';
 import { examinationBatchService } from '../../services/examinationBatchService';
 import { ExaminationBatch, ExaminationClass, ExaminationSubject } from '../../types';
+import { toast } from '../../components/Toast';
 import { ArrowLeft, Plus, Trash2, CheckCircle, BookOpen, Users, BookText, FileText, ChevronDown, ChevronUp, Eye, EyeOff, RefreshCw, Repeat, Printer } from 'lucide-react';
 import { AddClassDialog } from './components/AddClassDialog';
 import { ManageSubjectsDialog } from './components/ManageSubjectsDialog';
@@ -446,7 +447,10 @@ const ExaminationBatchDetail: React.FC = () => {
   };
 
   const isLocked = batch?.status === 'Approved' || batch?.status === 'Invoiced';
-  const schoolName = schools.find((school) => String(school.id) === String(batch?.school_id))?.name || 'Unknown School';
+  const { customers } = useExamination();
+  const schoolName = schools.find((school) => String(school.id) === String(batch?.school_id))?.name 
+    || customers.find(c => String(c.id) === String(batch?.school_id))?.name 
+    || 'Unknown School';
   const totalSubjects = batch?.classes?.reduce((count, cls) => count + (cls.subjects?.length || 0), 0) || 0;
   const statusBadgeClass =
     batch?.status === 'Invoiced'

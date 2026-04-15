@@ -16,7 +16,6 @@ import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, 
 import BankingReports from '../../components/BankingReports';
 import DocumentPreviewModal from '../../components/DocumentPreviewModal';
 import { AccountDetailsDashboard } from './components/AccountDetailsDashboard';
-import { Shield } from 'lucide-react';
 
 type ScheduledRow = {
   id: string;

@@ -423,12 +423,11 @@ const ExaminationHub: React.FC = () => {
 
   const exportData = () => {
     const csvContent = [
-      ['Batch Name', 'School', 'Classes', 'Number of Pages', 'Status', 'Amount', 'Created'],
+      ['Batch Name', 'School', 'Classes', 'Status', 'Amount', 'Created'],
       ...filteredBatches.map((batch) => [
         batch.name,
         getSchoolName(String(batch.school_id)),
         getBatchClassCount(batch),
-        getBatchPageCount(batch),
         batch.status,
         `${batch.currency || 'MWK'} ${(batch.total_amount || 0).toLocaleString()}`,
         new Date(batch.created_at).toLocaleDateString()
@@ -633,7 +632,6 @@ const ExaminationHub: React.FC = () => {
                     <th className="table-header">Exam Type</th>
                     <th className="table-header">Academic</th>
                     <th className="table-header text-right">Classes</th>
-                    <th className="table-header text-right">Number of Pages</th>
                     <th className="table-header text-right">Amount</th>
                     <th className="table-header">Status</th>
                     <th className="table-header text-right">Action</th>
@@ -680,7 +678,6 @@ const ExaminationHub: React.FC = () => {
                         <td className="table-body-cell text-slate-700">{batch.exam_type}</td>
                         <td className="table-body-cell text-slate-600">{batch.academic_year} Term {batch.term}</td>
                         <td className="table-body-cell text-right finance-nums text-slate-700">{getBatchClassCount(batch)}</td>
-                        <td className="table-body-cell text-right finance-nums text-slate-700">{getBatchPageCount(batch).toLocaleString()}</td>
                         <td className="table-body-cell text-right font-semibold finance-nums text-slate-900">
                           {batch.currency || companyConfig?.currencySymbol || 'MWK'}
                           {(batch.total_amount || 0).toLocaleString(undefined, {

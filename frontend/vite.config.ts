@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
     const apiProxyTarget =
       stripApiSuffix(env.VITE_API_PROXY_TARGET || '') ||
       stripApiSuffix(env.VITE_API_URL || '') ||
-      'https://prime-erp-system.onrender.com';
+      'https://prime-printing-service.onrender.com';
     return {
       server: {
         port: 3003,
@@ -36,8 +36,8 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-        'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://prime-erp-system.onrender.com'),
-        'process.env.API_BASE_URL': JSON.stringify(env.VITE_API_URL || 'https://prime-erp-system.onrender.com'),
+        'process.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || 'https://prime-printing-service.onrender.com'),
+        'process.env.API_BASE_URL': JSON.stringify(env.VITE_API_URL || 'https://prime-printing-service.onrender.com'),
       },
       resolve: {
         alias: {
