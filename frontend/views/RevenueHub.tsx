@@ -1,10 +1,17 @@
 
 import React from 'react';
-import { Activity, FileText, Users, PieChart, Sparkles, BarChart3 } from 'lucide-react';
+import { Activity, FileText, Users, PieChart, Sparkles, BarChart3, ShieldCheck } from 'lucide-react';
 import GenericHub from './GenericHub';
 
 const RevenueHub: React.FC = () => {
   const options = [
+    {
+      label: 'Dashboard',
+      description: 'Overview of revenue streams, trends, and financial performance.',
+      path: '/revenue',
+      icon: <Activity />,
+      color: 'bg-blue-50 text-blue-500'
+    },
     {
       label: 'Sales Audit',
       description: 'Comprehensive history of all sales transactions and audit trails.',
@@ -32,6 +39,13 @@ const RevenueHub: React.FC = () => {
       path: '/revenue/contacts',
       icon: <Users />,
       color: 'bg-emerald-50 text-emerald-500'
+    },
+    {
+      label: 'Internal Auditor',
+      description: 'Verify transactions, reconcile accounts, and detect discrepancies.',
+      path: '/revenue/auditor',
+      icon: <ShieldCheck />,
+      color: 'bg-slate-50 text-slate-600'
     },
     {
       label: 'Business Intel',

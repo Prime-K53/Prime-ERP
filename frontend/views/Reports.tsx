@@ -43,6 +43,7 @@ const Reports: React.FC = () => {
         if (location.pathname.includes('rounding-analytics')) return 'Rounding Analytics';
         if (location.pathname.includes('financials')) return 'Financials';
         if (location.pathname.includes('contacts')) return 'Client Ledger';
+        if (location.pathname.includes('auditor')) return 'Auditor';
         if (location.pathname.includes('intel')) return 'Business Intel';
         if (location.pathname.includes('health')) return 'Health Diagnostic';
         return 'Overview';
