@@ -408,6 +408,80 @@
   }
 }
 
+/* Modal specific refinements for typography, spacing, and density */
+@layer components {
+  .app-modal .modal-content {
+    background-color: #FCFCFD; /* slightly off-white to avoid pure white */
+    color: #0F172A; /* high contrast but not pure black */
+    @apply rounded-2xl shadow-2xl;
+    overflow: hidden;
+  }
+
+  .app-modal .modal-header {
+    padding: 12px 14px; /* header/top-bar padding (10-16px) */
+    background: transparent;
+  }
+
+  .app-modal .modal-title {
+    font-size: 22px; /* titles 20-24px */
+    line-height: 1.4;
+    font-weight: 600;
+    color: #0F172A;
+  }
+
+  .app-modal .modal-sub {
+    font-size: 13.5px;
+    color: #475569;
+    line-height: 1.45;
+  }
+
+  .app-modal .modal-label {
+    font-size: 12.5px; /* labels 12-13px */
+    line-height: 1.45;
+    font-weight: 500;
+    color: #475569;
+  }
+
+  .app-modal .modal-label-small {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #475569;
+  }
+
+  .app-modal .table-header {
+    font-size: 14px; /* table headers 13.5-14.4px */
+    font-weight: 600;
+    padding: 6px 8px; /* compact tab/table header padding 6-10px */
+    line-height: 1.4;
+  }
+
+  .app-modal .table-body-cell {
+    font-size: 13px;
+    padding: 6px 8px;
+    line-height: 1.45;
+  }
+
+  .app-modal .finance-nums, .app-modal .numeric-cell {
+    font-variant-numeric: tabular-nums; /* enforce tabular numbers for finance */
+    text-align: right; /* right-align numeric columns */
+  }
+
+  .app-modal .modal-btn-primary {
+    padding: 6px 12px; /* button padding compact: 6-8px vertical, 10-14px horizontal */
+    border-radius: 10px;
+  }
+
+  .app-modal .modal-btn-secondary {
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: transparent;
+  }
+
+  .app-modal .modal-close {
+    padding: 6px; /* compact close button */
+  }
+}
+
 @layer components {
   .zoho-card {
     @apply bg-white rounded-lg border border-slate-200 shadow-sm transition-all;

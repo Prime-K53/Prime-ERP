@@ -888,6 +888,7 @@ const handleQuickPrintConfirm = (quantity: number, pagesPerCopy: number, total: 
             ? (companyConfig.transactionSettings?.pos?.photocopyPrice || 2.00)
             : (companyConfig.transactionSettings?.pos?.typePrintingPrice || 5.00)}
           currency={currency}
+          staplePrice={companyConfig.transactionSettings?.pos?.staplePrice}
           pinningItem={(() => {
             const pinning = inventory.find(i => i.name?.toLowerCase().includes('staple') || i.name?.toLowerCase().includes('pin'));
             if (!pinning) return null;
