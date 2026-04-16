@@ -312,10 +312,10 @@ const ExaminationBatchForm: React.FC = () => {
                  value={formData.sales_account_id}
                  onChange={(event) => handleChange('sales_account_id', event.target.value)}
                />
-             </div>
 </div>
+            </div>
 
-           <div className="flex justify-end pt-2">
+            <div className="flex justify-end pt-2">
             <button
               type="submit"
               disabled={loading}
