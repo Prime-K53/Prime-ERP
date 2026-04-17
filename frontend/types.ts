@@ -200,6 +200,9 @@ export interface CompanyConfig {
     customerActivityNotifications: boolean;
     smsGatewayEnabled: boolean;
     emailGatewayEnabled: boolean;
+    dailySummaryEnabled: boolean;
+    dailySummaryTime: string;
+    dailySummaryEmail: string;
   };
   lateFeePolicy: LateFeePolicy;
   registrationNumber?: string;

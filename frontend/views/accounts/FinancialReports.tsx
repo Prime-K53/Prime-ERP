@@ -1020,23 +1020,7 @@ const FinancialReports: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Sub Navigation Tabs */}
-                    <div className="flex border-b border-slate-200 mb-8 no-print overflow-x-auto custom-scrollbar">
-                        {(['IncomeStatement', 'BalanceSheet', 'CashFlow', 'TrialBalance', 'Budget', 'AgedAR', 'AgedAP'] as const).map(type => (
-                            <button
-                                key={type}
-                                onClick={() => setReportType(type)}
-                                className={`px-6 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-4 ${reportType === type ? 'border-[#2CA01C] text-[#2CA01C]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-                            >
-                                {type === 'IncomeStatement' ? 'Profit & Loss' :
-                                    type === 'BalanceSheet' ? 'Balance Sheet' :
-                                        type === 'CashFlow' ? 'Cash Flow' :
-                                            type === 'TrialBalance' ? 'Trial Balance' :
-                                                type === 'Budget' ? 'Budget Analysis' :
-                                                    type === 'AgedAR' ? 'Aged Receivables' : 'Aged Payables'}
-                            </button>
-                        ))}
-                    </div>
+                    
 
                     {/* Report Content */}
                     <div id="financial-report-printable" className="bg-white rounded border border-slate-200 shadow-sm overflow-hidden mb-12">

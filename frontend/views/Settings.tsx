@@ -3069,19 +3069,58 @@ const Settings: React.FC = () => {
                                                     <p className="font-black text-slate-800 uppercase text-base group-hover:text-blue-600 transition-colors">Daily Performance Summary</p>
                                                     <p className="text-sm text-slate-500 mt-1 font-medium italic">Receive a consolidated report of sales and stock movements.</p>
                                                 </div>
-                                                <input
-                                                    type="time"
-                                                    className="px-6 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all hover:border-blue-200"
-                                                    value={config.notificationSettings?.dailySummaryTime || "20:00"}
-                                                    onChange={e => setConfig({
-                                                        ...config,
-                                                        notificationSettings: {
-                                                            ...(config.notificationSettings || { emailEnabled: false, smsEnabled: false, systemAlertsEnabled: true, syncIntervalMinutes: 30, lastSyncTimestamp: '', syncStatus: 'Idle', autoSyncEnabled: false }),
-                                                            dailySummaryTime: e.target.value
-                                                        }
-                                                    })}
-                                                />
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={config.notificationSettings?.dailySummaryEnabled || false}
+                                                        onChange={e => setConfig({
+                                                            ...config,
+                                                            notificationSettings: {
+                                                                ...(config.notificationSettings || { customerActivityNotifications: false, smsGatewayEnabled: false, emailGatewayEnabled: false, dailySummaryEnabled: false, dailySummaryTime: '20:00', dailySummaryEmail: '' }),
+                                                                dailySummaryEnabled: e.target.checked
+                                                            }
+                                                        })}
+                                                    />
+                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2CA01C]"></div>
+                                                </label>
                                             </div>
+                                            
+                                            {config.notificationSettings?.dailySummaryEnabled && (
+                                                <div className="grid grid-cols-2 gap-4 mt-4 p-4 bg-slate-50 rounded-lg">
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Summary Time</label>
+                                                        <input
+                                                            type="time"
+                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"
+                                                            value={config.notificationSettings?.dailySummaryTime || "20:00"}
+                                                            onChange={e => setConfig({
+                                                                ...config,
+                                                                notificationSettings: {
+                                                                    ...(config.notificationSettings || { customerActivityNotifications: false, smsGatewayEnabled: false, emailGatewayEnabled: false, dailySummaryEnabled: true, dailySummaryTime: '20:00', dailySummaryEmail: '' }),
+                                                                    dailySummaryTime: e.target.value
+                                                                }
+                                                            })}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs font-semibold text-slate-600 mb-1 block">Email Address</label>
+                                                        <input
+                                                            type="email"
+                                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm"
+                                                            placeholder="report@company.com"
+                                                            value={config.notificationSettings?.dailySummaryEmail || ''}
+                                                            onChange={e => setConfig({
+                                                                ...config,
+                                                                notificationSettings: {
+                                                                    ...(config.notificationSettings || { customerActivityNotifications: false, smsGatewayEnabled: false, emailGatewayEnabled: false, dailySummaryEnabled: true, dailySummaryTime: '20:00', dailySummaryEmail: '' }),
+                                                                    dailySummaryEmail: e.target.value
+                                                                }
+                                                            })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </section>
                                 </div>

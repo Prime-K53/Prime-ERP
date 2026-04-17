@@ -36,10 +36,11 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ inventory, addToCart, 
     }, [companyConfig.transactionSettings?.quickItemEntry]);
 
     const saleableInventory = inventory.filter(i => i.type !== 'Material');
+    const typeCategories = ['All', 'Service', 'Product', 'Package', 'Rental'];
     const categories = ['All', ...Array.from(new Set(saleableInventory.map(i => i.category)))];
 
     const filteredProducts = saleableInventory.filter(p =>
-        (activeCategory === 'All' || p.category === activeCategory) &&
+        (activeCategory === 'All' || p.category === activeCategory || p.type === activeCategory) &&
         (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             p.sku.toLowerCase().includes(searchTerm.toLowerCase()))
     );
@@ -201,7 +202,7 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ inventory, addToCart, 
                 </div>
             </div>
 
-            {companyConfig.transactionSettings?.pos?.showCategories !== false && (
+            {companyConfig.transactionSettings?.pos?.showCategoryFilters !== false && (
                 <div className="bg-white border-b border-slate-200 overflow-x-auto no-scrollbar z-30 sticky top-[61px]">
                     <div className="flex gap-1 px-6 py-2">
                         {categories.map(cat => {
