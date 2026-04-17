@@ -44,6 +44,30 @@ export interface TransactionSettingsConfig {
     receiptFooter: string;
     requireCustomer: boolean;
     defaultPaymentMethod: string;
+    showShortcutHints: boolean;
+    shortcutLabels: {
+      F1: string;
+      F2: string;
+      F3: string;
+      F10: string;
+    };
+  };
+  
+  // Company payment details for banking and documents
+  paymentDetails: {
+    bankAccounts: Array<{
+      id: string;
+      bankName: string;
+      accountName: string;
+      accountNumber: string;
+      branchCode?: string;
+    }>;
+    mobileMoneyAccounts: Array<{
+      id: string;
+      network: string;
+      accountName: string;
+      phoneNumber: string;
+    }>;
   };
 
   // Numbering rules (dynamic by transaction type)

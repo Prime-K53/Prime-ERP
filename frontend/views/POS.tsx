@@ -773,7 +773,14 @@ const handleQuickPrintConfirm = (quantity: number, pagesPerCopy: number, total: 
           </div>
 
           <div className="flex gap-3 items-center">
-            <span className="text-[11px] text-slate-500 font-medium hidden xl:block italic">F1: Cust • F2: Photo • F3: Print • F10: Pay</span>
+            {companyConfig?.transactionSettings?.pos?.showShortcutHints !== false && (
+              <span className="text-[11px] text-slate-500 font-medium hidden xl:block italic">
+                {companyConfig?.transactionSettings?.pos?.shortcutLabels?.F1 ? `F1: ${companyConfig.transactionSettings.pos.shortcutLabels.F1} • ` : 'F1: Cust • '}
+                {companyConfig?.transactionSettings?.pos?.shortcutLabels?.F2 ? `F2: ${companyConfig.transactionSettings.pos.shortcutLabels.F2} • ` : 'F2: Photo • '}
+                {companyConfig?.transactionSettings?.pos?.shortcutLabels?.F3 ? `F3: ${companyConfig.transactionSettings.pos.shortcutLabels.F3} • ` : 'F3: Print • '}
+                {companyConfig?.transactionSettings?.pos?.shortcutLabels?.F10 ? `F10: ${companyConfig.transactionSettings.pos.shortcutLabels.F10}` : 'F10: Pay'}
+              </span>
+            )}
             <div className="flex gap-2">
               <button onClick={() => setShowHeldOrdersModal(true)} className="px-4 py-1.5 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-100 flex items-center gap-2">
                 <ClockIcon size={14} /> Held ({heldOrders.length})

@@ -115,6 +115,17 @@ const Settings: React.FC = () => {
                 allowDiscounts: false,
                 gridColumns: 3,
                 showCategoryFilters: false,
+                showShortcutHints: true,
+                shortcutLabels: {
+                    F1: 'Cust',
+                    F2: 'Photo',
+                    F3: 'Print',
+                    F10: 'Pay'
+                },
+                paymentDetails: {
+                    bankAccounts: [],
+                    mobileMoneyAccounts: []
+                },
                 photocopyPrice: 0,
                 typePrintingPrice: 0,
                 receiptFooter: ''
@@ -488,7 +499,8 @@ const Settings: React.FC = () => {
             items: [
                 { id: 'Currencies', icon: Wallet, label: 'Currencies', desc: 'Currency symbols and precision' },
                 { id: 'Transactions', icon: RefreshCw, label: 'Transaction Prefixes', desc: 'Numbering sequences for documents' },
-                { id: 'GLMapping', icon: Binary, label: 'Chart of Accounts', desc: 'Ledger and mapping configurations' }
+                { id: 'GLMapping', icon: Binary, label: 'Chart of Accounts', desc: 'Ledger and mapping configurations' },
+                { id: 'PaymentDetails', icon: Landmark, label: 'Payment Details', desc: 'Bank and mobile money accounts' }
             ]
         },
         {
@@ -1314,6 +1326,21 @@ const Settings: React.FC = () => {
                                                 </div>
                                                 <div className="flex justify-between items-center group/item">
                                                     <div>
+                                                        <p className="font-bold text-slate-800 text-sm">Show Shortcut Hints</p>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5">Show F1, F2, F3, F10 shortcut hints on POS toolbar.</p>
+                                                    </div>
+                                                    <label className="relative inline-flex items-center cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={config.transactionSettings?.pos?.showShortcutHints !== false}
+                                                            onChange={e => setConfig({ ...config, transactionSettings: { ...config.transactionSettings, pos: { ...config.transactionSettings?.pos, showShortcutHints: e.target.checked } } })}
+                                                        />
+                                                        <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2CA01C]"></div>
+                                                    </label>
+                                                </div>
+                                                <div className="flex justify-between items-center group/item">
+                                                    <div>
                                                         <p className="font-bold text-slate-800 text-sm">Enable Item Discounts</p>
                                                         <p className="text-[11px] text-slate-500 mt-0.5">Allow manual discounts on individual items.</p>
                                                     </div>
@@ -1671,6 +1698,211 @@ const Settings: React.FC = () => {
                                                 </div>
                                             </div>
                                         ))}
+                                    </div>
+                                </section>
+                            </div>
+                        )}
+
+                        {activeTab === 'PaymentDetails' && (
+                            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4">
+                                <section>
+                                    <div className="flex justify-between items-center mb-8">
+                                        <div>
+                                            <h3 className="text-[11px] font-black text-[#6B6C6F] uppercase tracking-[0.2em] flex items-center gap-3">
+                                                <Landmark size={18} className="text-[#2CA01C]" /> Payment Details
+                                            </h3>
+                                            <p className="text-xs text-[#6B6C6F] mt-1">Manage bank and mobile money accounts for payments.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Bank Accounts */}
+                                    <div className="mb-8">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="font-bold text-[#393A3D]">Bank Accounts</h4>
+                                            <button
+                                                onClick={() => {
+                                                    const newAccount = {
+                                                        id: Date.now().toString(),
+                                                        bankName: '',
+                                                        accountName: '',
+                                                        accountNumber: '',
+                                                        branchCode: ''
+                                                    };
+                                                    setConfig({
+                                                        ...config,
+                                                        transactionSettings: {
+                                                            ...config.transactionSettings,
+                                                            paymentDetails: {
+                                                                ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }),
+                                                                bankAccounts: [
+                                                                    ...(config.transactionSettings?.paymentDetails?.bankAccounts || []),
+                                                                    newAccount
+                                                                ]
+                                                            }
+                                                        }
+                                                    });
+                                                }}
+                                                className="px-3 py-1.5 bg-[#2CA01C] text-white rounded-md text-xs font-bold hover:bg-[#1f8a14] transition-all"
+                                            >
+                                                + Add Bank Account
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {(config.transactionSettings?.paymentDetails?.bankAccounts || []).map((bank, idx) => (
+                                                <div key={bank.id} className="p-4 bg-white rounded-lg border border-[#D4D7DC] shadow-sm">
+                                                    <div className="grid grid-cols-4 gap-3">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Bank Name (e.g. Standard Bank)"
+                                                            className="settings-input"
+                                                            value={bank.bankName}
+                                                            onChange={e => {
+                                                                const updated = [...(config.transactionSettings?.paymentDetails?.bankAccounts || [])];
+                                                                updated[idx] = { ...updated[idx], bankName: e.target.value };
+                                                                setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), bankAccounts: updated } } });
+                                                            }}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Account Name"
+                                                            className="settings-input"
+                                                            value={bank.accountName}
+                                                            onChange={e => {
+                                                                const updated = [...(config.transactionSettings?.paymentDetails?.bankAccounts || [])];
+                                                                updated[idx] = { ...updated[idx], accountName: e.target.value };
+                                                                setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), bankAccounts: updated } } });
+                                                            }}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Account Number"
+                                                            className="settings-input"
+                                                            value={bank.accountNumber}
+                                                            onChange={e => {
+                                                                const updated = [...(config.transactionSettings?.paymentDetails?.bankAccounts || [])];
+                                                                updated[idx] = { ...updated[idx], accountNumber: e.target.value };
+                                                                setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), bankAccounts: updated } } });
+                                                            }}
+                                                        />
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Branch Code"
+                                                                className="settings-input"
+                                                                value={bank.branchCode || ''}
+                                                                onChange={e => {
+                                                                    const updated = [...(config.transactionSettings?.paymentDetails?.bankAccounts || [])];
+                                                                    updated[idx] = { ...updated[idx], branchCode: e.target.value };
+                                                                    setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), bankAccounts: updated } } });
+                                                                }}
+                                                            />
+                                                            <button
+                                                                onClick={() => {
+                                                                    const updated = (config.transactionSettings?.paymentDetails?.bankAccounts || []).filter((_, i) => i !== idx);
+                                                                    setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), bankAccounts: updated } } });
+                                                                }}
+                                                                className="p-2 text-red-500 hover:bg-red-50 rounded"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(config.transactionSettings?.paymentDetails?.bankAccounts || []).length === 0 && (
+                                                <p className="text-sm text-slate-400 text-center py-4">No bank accounts added yet.</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Mobile Money Accounts */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="font-bold text-[#393A3D]">Mobile Money Accounts</h4>
+                                            <button
+                                                onClick={() => {
+                                                    const newAccount = {
+                                                        id: Date.now().toString(),
+                                                        network: 'Airtel',
+                                                        accountName: '',
+                                                        phoneNumber: ''
+                                                    };
+                                                    setConfig({
+                                                        ...config,
+                                                        transactionSettings: {
+                                                            ...config.transactionSettings,
+                                                            paymentDetails: {
+                                                                ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }),
+                                                                mobileMoneyAccounts: [
+                                                                    ...(config.transactionSettings?.paymentDetails?.mobileMoneyAccounts || []),
+                                                                    newAccount
+                                                                ]
+                                                            }
+                                                        }
+                                                    });
+                                                }}
+                                                className="px-3 py-1.5 bg-[#2CA01C] text-white rounded-md text-xs font-bold hover:bg-[#1f8a14] transition-all"
+                                            >
+                                                + Add Mobile Money
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {(config.transactionSettings?.paymentDetails?.mobileMoneyAccounts || []).map((mm, idx) => (
+                                                <div key={mm.id} className="p-4 bg-white rounded-lg border border-[#D4D7DC] shadow-sm">
+                                                    <div className="grid grid-cols-3 gap-3">
+                                                        <select
+                                                            className="settings-input"
+                                                            value={mm.network}
+                                                            onChange={e => {
+                                                                const updated = [...(config.transactionSettings?.paymentDetails?.mobileMoneyAccounts || [])];
+                                                                updated[idx] = { ...updated[idx], network: e.target.value };
+                                                                setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), mobileMoneyAccounts: updated } } });
+                                                            }}
+                                                        >
+                                                            <option value="Airtel">Airtel Money</option>
+                                                            <option value="TNM">TNM Mpamba</option>
+                                                            <option value="MTN">MTN MoMo</option>
+                                                        </select>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Account Name"
+                                                            className="settings-input"
+                                                            value={mm.accountName}
+                                                            onChange={e => {
+                                                                const updated = [...(config.transactionSettings?.paymentDetails?.mobileMoneyAccounts || [])];
+                                                                updated[idx] = { ...updated[idx], accountName: e.target.value };
+                                                                setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), mobileMoneyAccounts: updated } } });
+                                                            }}
+                                                        />
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Phone Number"
+                                                                className="settings-input"
+                                                                value={mm.phoneNumber}
+                                                                onChange={e => {
+                                                                    const updated = [...(config.transactionSettings?.paymentDetails?.mobileMoneyAccounts || [])];
+                                                                    updated[idx] = { ...updated[idx], phoneNumber: e.target.value };
+                                                                    setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), mobileMoneyAccounts: updated } } });
+                                                                }}
+                                                            />
+                                                            <button
+                                                                onClick={() => {
+                                                                    const updated = (config.transactionSettings?.paymentDetails?.mobileMoneyAccounts || []).filter((_, i) => i !== idx);
+                                                                    setConfig({ ...config, transactionSettings: { ...config.transactionSettings, paymentDetails: { ...(config.transactionSettings?.paymentDetails || { bankAccounts: [], mobileMoneyAccounts: [] }), mobileMoneyAccounts: updated } } });
+                                                                }}
+                                                                className="p-2 text-red-500 hover:bg-red-50 rounded"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(config.transactionSettings?.paymentDetails?.mobileMoneyAccounts || []).length === 0 && (
+                                                <p className="text-sm text-slate-400 text-center py-4">No mobile money accounts added yet.</p>
+                                            )}
+                                        </div>
                                     </div>
                                 </section>
                             </div>
