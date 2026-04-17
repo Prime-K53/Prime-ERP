@@ -1,5 +1,6 @@
 import React from 'react';
-import { Document, Page, View, Text, Font, Image } from '@react-pdf/renderer';
+import { Document, Page, View, Text, Font, Image, Svg, Path } from '@react-pdf/renderer';
+import QRCode from 'qrcode';
 import { docStyles as s } from './styles.ts';
 import { PrimeDocData } from './schemas.ts';
 import { CompanyConfig } from '../../../../types.ts';
@@ -164,161 +165,741 @@ const SecurityFooter = ({
 };
 
 const CleanInvoiceTemplate = ({
+  type,
   data,
   config,
   templateSettings
 }: {
+  type: string;
   data: PrimeDocData;
   config: CompanyConfig | null;
   templateSettings: ReturnType<typeof resolvePrimeTemplateSettings>;
 }) => {
   const dataAny = data as any;
-  const companyName = config?.companyName || 'Company Name';
-  const companyAddress = config?.addressLine1 || 'Address';
-  const companyPhone = config?.phone || 'Phone';
-  const companyEmail = config?.email || 'email@example.com';
-  const currency = config?.currencySymbol || 'K';
+  const fontScale = templateSettings.bodyFontSize / 12;
 
-  const invoiceNumber = dataAny.invoiceNumber || dataAny.number || 'INV-001';
+  // Company Details
+  const companyName = config?.companyName || 'Prime Printing & Stationery';
+  const companyAddress = config?.addressLine1 || 'Lilongwe, Malawi';
+  const rawPhone = config?.phone || '';
+  const formattedPhone = rawPhone.replace(/(\+265\s?\d{3}\s?\d{3}\s?\d{3})(?=\+265)/g, '$1 | ');
+  const companyPhone = formattedPhone || 'N/A';
+  const companyEmail = config?.email || 'N/A';
+  const currency = config?.currencySymbol || 'K';
+  
+  const logo = templateSettings.showCompanyLogo ? (config?.logoBase64 || COMPANY_LOGO_BASE64) : '';
+  const accentColor = templateSettings.accentColor || '#5a9e96';
+
+  let docTitle = 'INVOICE';
+  if (type === 'QUOTATION') docTitle = 'QUOTATION';
+  else if (type === 'ORDER' || type === 'SALES_ORDER') docTitle = 'SALES ORDER';
+  else if (type === 'PO') docTitle = 'PURCHASE ORDER';
+  else if (type === 'SUBSCRIPTION') docTitle = 'RECURRING INVOICE';
+
+  // Invoice Details
+  const invoiceNumber = dataAny.invoiceNumber || dataAny.orderNumber || dataAny.number || '001';
   const invoiceDate = dataAny.date || new Date().toLocaleDateString();
-  const clientName = dataAny.clientName || 'Client Name';
-  const clientAddress = dataAny.address || 'Client Address';
-  const clientEmail = dataAny.phone || 'client@email.com';
+  const dueDate = dataAny.dueDate;
+  
+  // Recipient Details
+  const resolvedRecipientName = String(
+    dataAny.clientName || dataAny.customerName || dataAny.customer_name || dataAny.schoolName || dataAny.school_name || dataAny.recipientName || dataAny.recipient_name || dataAny.vendorName || dataAny.vendor_name || dataAny.supplierName || dataAny.supplier_name || dataAny.proofOfDelivery?.receivedBy || dataAny.receivedBy || ''
+  ).trim();
+  const resolvedRecipientAddress = String(
+    dataAny.address || dataAny.customerAddress || dataAny.customer_address || dataAny.billingAddress || dataAny.billing_address || dataAny.shippingAddress || dataAny.shipping_address || dataAny.schoolAddress || dataAny.school_address || dataAny.vendorAddress || dataAny.vendor_address || dataAny.supplierAddress || dataAny.supplier_address || dataAny.proofOfDelivery?.address || dataAny.proofOfDelivery?.deliveryLocation || ''
+  ).trim();
+  const resolvedRecipientPhone = String(
+    dataAny.phone || dataAny.customerPhone || dataAny.customer_phone || dataAny.schoolPhone || dataAny.school_phone || dataAny.vendorPhone || dataAny.vendor_phone || dataAny.supplierPhone || dataAny.supplier_phone || dataAny.recipientPhone || dataAny.recipient_phone || dataAny.proofOfDelivery?.receiverPhone || dataAny.proofOfDelivery?.recipientPhone || dataAny.proofOfDelivery?.phone || ''
+  ).trim();
+
+  // Financials
   const items = dataAny.items || [];
   const subtotal = dataAny.subtotal || 0;
   const amountPaid = dataAny.amountPaid || 0;
   const totalAmount = dataAny.totalAmount || subtotal;
-  const tax = dataAny.tax || 100;
-  const grandTotal = totalAmount + tax;
+  const tax = dataAny.tax || 0;
+  const discount = dataAny.discount || 0;
+  
+  const showInvoiceBalances = templateSettings.showOutstandingAndWalletBalances;
+  const resolvedWalletBalance = Number(dataAny?.walletBalance || 0);
+  const resolvedOutstandingBalance = Math.max(0, Number(dataAny?.totalAmount || 0) - Number(dataAny?.amountPaid || 0));
 
-  const renderRow = (item: any, i: number) => (
-    <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#e0e0e0' }}>
-      <Text style={{ flex: 2, padding: 8, fontSize: 11 }}>{item.desc || item.name}</Text>
-      <Text style={{ width: 60, padding: 8, fontSize: 11, textAlign: 'right' }}>{item.qty}</Text>
-      <Text style={{ width: 80, padding: 8, fontSize: 11, textAlign: 'right' }}>{currency} {(item.price || item.total / item.qty).toFixed(2)}</Text>
-      <Text style={{ width: 80, padding: 8, fontSize: 11, textAlign: 'right' }}>{currency} {item.total.toFixed(2)}</Text>
-    </View>
-  );
+  const showPaymentTerms = templateSettings.showPaymentTerms;
+  const paymentTermsLabel = String(dataAny?.paymentTerms || '').trim() || getDefaultPaymentTermsLabel(config);
+  
+  const companyEnquiryLine = [companyName, companyAddress].filter(Boolean).join(', ');
+  const legalFooterLine1 = showPaymentTerms
+    ? `This is a computer-generated document. Payment terms: ${paymentTermsLabel}.`
+    : 'This is a computer-generated document. All accounts are subject to our terms of service';
+  const legalFooterLine2 = `For enquiries contact: ${companyEnquiryLine} Phone: ${companyPhone}`;
+
+  const renderRow = (item: any, i: number) => {
+    const isService = item.category === 'service' || item.type === 'service' || item.isService === true;
+    let formattedDesc = item.desc || item.name;
+    if (isService) {
+      const totalPages = item.totalPages || item.pages || 0;
+      const copies = item.copies || item.qty || 1;
+      const itemName = item.name || item.desc || 'Service';
+      if (totalPages > 0) {
+        formattedDesc = `${itemName} (${totalPages} pages × ${copies} copies)`;
+      }
+    }
+      
+    return (
+      <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#e0e0e0', minHeight: 24, alignItems: 'center', paddingVertical: 4 }}>
+        <Text style={{ flex: 2, paddingHorizontal: 8, fontSize: 10 * fontScale, color: '#334155' }}>{formattedDesc}</Text>
+        <Text style={{ width: 60, paddingHorizontal: 8, fontSize: 10 * fontScale, color: '#334155', textAlign: 'right' }}>{item.qty}</Text>
+        <Text style={{ width: 80, paddingHorizontal: 8, fontSize: 10 * fontScale, color: '#334155', textAlign: 'right' }}>{currency} {(item.price || (item.qty ? item.total / item.qty : 0)).toFixed(2)}</Text>
+        <Text style={{ width: 80, paddingHorizontal: 8, fontSize: 10 * fontScale, color: '#334155', textAlign: 'right' }}>{currency} {item.total.toFixed(2)}</Text>
+      </View>
+    );
+  };
 
   return (
-    <Document title={`Invoice ${invoiceNumber}`} author={companyName}>
-      <Page size="A4" style={{ padding: 40, fontFamily: 'Helvetica' }}>
-        <View style={{ alignItems: 'center', marginBottom: 30 }}>
-          <View style={{ 
-            width: 48, 
-            height: 48, 
-            borderRadius: 24, 
-            backgroundColor: '#333', 
-            alignItems: 'center', 
-            justifyContent: 'center',
-            marginBottom: 8
-          }}>
-            <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>F</Text>
-          </View>
-          <Text style={{ fontSize: 14, fontWeight: '600', letterSpacing: 2, color: '#666' }}>
-            FOX NETWORK
-          </Text>
-          <Text style={{ fontSize: 11, color: '#777', marginTop: 4, textAlign: 'center' }}>
-            {companyAddress}, {companyPhone}{'\n'}
-            {companyEmail}
-          </Text>
+    <Document title={`${docTitle} ${invoiceNumber}`} author={companyName}>
+      <Page size="A4" style={{ padding: 40, fontFamily: templateSettings.fontFamily }}>
+        {/* Header */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 }}>
+           <View style={{ flex: 1 }}>
+              {logo ? (
+                <Image src={logo} style={{ width: templateSettings.logoWidth, marginBottom: 10 }} />
+              ) : (
+                <Text style={{ fontSize: templateSettings.companyNameFontSize, fontWeight: 'bold', color: accentColor, marginBottom: 8 }}>{companyName}</Text>
+              )}
+              <Text style={{ fontSize: 9 * fontScale, color: '#64748b', lineHeight: 1.4 }}>{companyAddress}</Text>
+              <Text style={{ fontSize: 9 * fontScale, color: '#64748b', marginTop: 2 }}>{companyPhone}</Text>
+              {companyEmail !== 'N/A' && <Text style={{ fontSize: 9 * fontScale, color: '#64748b', marginTop: 2 }}>{companyEmail}</Text>}
+           </View>
+           <View style={{ flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+              <Text style={{ fontSize: 26 * fontScale, fontWeight: '300', color: '#1e293b', letterSpacing: 1.5 }}>{docTitle}</Text>
+              <Text style={{ fontSize: 11 * fontScale, color: '#475569', marginTop: 8, fontWeight: 'bold' }}>{invoiceNumber}</Text>
+           </View>
         </View>
 
-        <View style={{ alignItems: 'center', marginBottom: 30 }}>
-          <Text style={{ fontSize: 36, fontWeight: '300', color: '#1a1a1a' }}>
-            Invoice <Text style={{ fontStyle: 'italic' }}>Service</Text>
-          </Text>
-        </View>
-
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 30, gap: 40 }}>
-          <Text style={{ fontSize: 12, color: '#555' }}>
-            <Text style={{ fontWeight: '600', color: '#1a1a1a' }}>Invoice Number:</Text> {invoiceNumber}
-          </Text>
-          <Text style={{ fontSize: 12, color: '#555' }}>
-            <Text style={{ fontWeight: '600', color: '#1a1a1a' }}>Invoice Date:</Text> {invoiceDate}
-          </Text>
-        </View>
-
+        {/* Company and Client Info */}
         <View style={{ flexDirection: 'row', marginBottom: 30, gap: 30 }}>
           <View style={{ flex: 1 }}>
-            <View style={{ 
-              backgroundColor: templateSettings.accentColor || '#5a9e96', 
-              padding: 5, 
-              borderRadius: 3,
-              alignSelf: 'flex-start',
-              marginBottom: 8
-            }}>
-              <Text style={{ fontSize: 10, fontWeight: '500', letterSpacing: 1.5, color: '#fff' }}>
-                PAYMENT INFO
-              </Text>
-            </View>
-            <Text style={{ fontSize: 12, color: '#555', marginBottom: 2 }}>Bank Transfer</Text>
-            <Text style={{ fontSize: 12, color: '#555', marginBottom: 2 }}>David Joe</Text>
-            <Text style={{ fontSize: 12, color: '#555' }}>0129 9847 3829</Text>
+            <Text style={{ fontSize: 8 * fontScale, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 6, letterSpacing: 1 }}>Bill To</Text>
+            <Text style={{ fontSize: 11 * fontScale, fontWeight: 'bold', color: '#1e293b', marginBottom: 4 }}>{resolvedRecipientName || 'N/A'}</Text>
+            {resolvedRecipientAddress && <Text style={{ fontSize: 10 * fontScale, color: '#475569', marginBottom: 3, lineHeight: 1.4 }}>{resolvedRecipientAddress}</Text>}
+            {resolvedRecipientPhone && <Text style={{ fontSize: 10 * fontScale, color: '#475569' }}>{resolvedRecipientPhone}</Text>}
           </View>
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>
-            <View style={{ 
-              backgroundColor: templateSettings.accentColor || '#5a9e96', 
-              padding: 5, 
-              borderRadius: 3,
-              alignSelf: 'flex-end',
-              marginBottom: 8
-            }}>
-              <Text style={{ fontSize: 10, fontWeight: '500', letterSpacing: 1.5, color: '#fff' }}>
-                BILL TO
-              </Text>
+          <View style={{ flex: 1, alignItems: 'flex-start' }}>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ fontSize: 8 * fontScale, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 3, letterSpacing: 1 }}>Date</Text>
+              <Text style={{ fontSize: 10 * fontScale, color: '#1e293b', fontWeight: 'bold' }}>{invoiceDate}</Text>
             </View>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: '#1a1a1a', marginBottom: 2 }}>{clientName}</Text>
-            <Text style={{ fontSize: 12, color: '#555', marginBottom: 2 }}>{clientEmail}</Text>
-            <Text style={{ fontSize: 12, color: '#555' }}>{clientAddress}</Text>
+            {templateSettings.showDueDate && dueDate && (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 8 * fontScale, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 3, letterSpacing: 1 }}>Due Date</Text>
+                <Text style={{ fontSize: 10 * fontScale, color: '#1e293b', fontWeight: 'bold' }}>{dueDate}</Text>
+              </View>
+            )}
+          </View>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            {dataAny.status && (
+              <View style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 4, borderWidth: 1, borderColor: getStatusTone(dataAny.status).border, backgroundColor: getStatusTone(dataAny.status).border + '15' }}>
+                <Text style={{ fontSize: 12 * fontScale, color: getStatusTone(dataAny.status).text, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 }}>{dataAny.status.toUpperCase()}</Text>
+              </View>
+            )}
           </View>
         </View>
 
+        {/* Table representation */}
         <View style={{ marginBottom: 20 }}>
-          <View style={{ flexDirection: 'row', backgroundColor: templateSettings.accentColor || '#5a9e96', borderRadius: 3 }}>
-            <Text style={{ flex: 2, padding: 8, fontSize: 11, fontWeight: '500', color: '#fff' }}>Item Description</Text>
-            <Text style={{ width: 60, padding: 8, fontSize: 11, fontWeight: '500', color: '#fff', textAlign: 'right' }}>Qty.</Text>
-            <Text style={{ width: 80, padding: 8, fontSize: 11, fontWeight: '500', color: '#fff', textAlign: 'right' }}>Unit Price</Text>
-            <Text style={{ width: 80, padding: 8, fontSize: 11, fontWeight: '500', color: '#fff', textAlign: 'right' }}>Amount</Text>
+          <View style={{ flexDirection: 'row', backgroundColor: accentColor, borderRadius: 4, minHeight: 28, alignItems: 'center' }}>
+            <Text style={{ flex: 2, paddingHorizontal: 8, fontSize: 10 * fontScale, fontWeight: 'bold', color: '#ffffff' }}>Item Description</Text>
+            <Text style={{ width: 60, paddingHorizontal: 8, fontSize: 10 * fontScale, fontWeight: 'bold', color: '#ffffff', textAlign: 'right' }}>Qty</Text>
+            <Text style={{ width: 80, paddingHorizontal: 8, fontSize: 10 * fontScale, fontWeight: 'bold', color: '#ffffff', textAlign: 'right' }}>Unit Price</Text>
+            <Text style={{ width: 80, paddingHorizontal: 8, fontSize: 10 * fontScale, fontWeight: 'bold', color: '#ffffff', textAlign: 'right' }}>Amount</Text>
           </View>
           {items.map(renderRow)}
-          <View style={{ flexDirection: 'row', backgroundColor: '#f0f0ee', borderRadius: 3 }}>
-            <Text style={{ flex: 2, padding: 8, fontSize: 12, fontWeight: '600' }}>Total Payment</Text>
-            <Text style={{ width: 60, padding: 8, fontSize: 12, textAlign: 'right' }}>-</Text>
-            <Text style={{ width: 80, padding: 8, fontSize: 12, textAlign: 'right' }}>-</Text>
-            <Text style={{ width: 80, padding: 8, fontSize: 12, fontWeight: '600', textAlign: 'right' }}>{currency} {subtotal.toFixed(2)}</Text>
+        </View>
+
+        {/* Totals Section */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 }}>
+          <View style={{ flex: 1.5, paddingRight: 40 }}>
+             {/* Notes region */}
+             {dataAny.notes && (
+                <View>
+                   <Text style={{ fontSize: 8 * fontScale, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4, letterSpacing: 1 }}>Notes</Text>
+                   <Text style={{ fontSize: 10 * fontScale, color: '#475569', lineHeight: 1.4 }}>{dataAny.notes}</Text>
+                </View>
+             )}
+          </View>
+
+          <View style={{ flex: 1, minWidth: 220 }}>
+            <View style={{ flexDirection: 'row', paddingVertical: 4 }}>
+              <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#475569' }}>Subtotal</Text>
+              <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#1e293b', fontWeight: 'bold', textAlign: 'right' }}>{currency} {subtotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+            </View>
+            {discount > 0 && (
+              <View style={{ flexDirection: 'row', paddingVertical: 4 }}>
+                <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#475569' }}>Discount</Text>
+                <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#1e293b', fontWeight: 'bold', textAlign: 'right' }}>-{currency} {discount.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+              </View>
+            )}
+            {tax > 0 && (
+              <View style={{ flexDirection: 'row', paddingVertical: 4 }}>
+                <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#475569' }}>Tax</Text>
+                <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#1e293b', fontWeight: 'bold', textAlign: 'right' }}>{currency} {tax.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+              </View>
+            )}
+            
+            {type !== 'INVOICE' && type !== 'ORDER' && type !== 'QUOTATION' && type !== 'SUBSCRIPTION' && (
+              <View style={{ flexDirection: 'row', paddingVertical: 6, borderTopWidth: 1, borderColor: '#e2e8f0', marginTop: 4 }}>
+                <Text style={{ flex: 1, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#1e293b' }}>Total Amount</Text>
+                <Text style={{ flex: 1, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#1e293b', textAlign: 'right' }}>{currency} {(totalAmount).toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+              </View>
+            )}
+            
+            {type !== 'QUOTATION' && type !== 'SUBSCRIPTION' && (
+              <View style={{ flexDirection: 'row', paddingVertical: 4, marginTop: (type === 'INVOICE' || type === 'ORDER') ? 4 : 0, borderTopWidth: (type === 'INVOICE' || type === 'ORDER') ? 1 : 0, borderColor: '#e2e8f0', paddingTop: (type === 'INVOICE' || type === 'ORDER') ? 8 : 4 }}>
+                <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#475569' }}>Amount Paid</Text>
+                <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#1e293b', fontWeight: 'bold', textAlign: 'right' }}>{currency} {amountPaid.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+              </View>
+            )}
+            
+            {showInvoiceBalances && type === 'INVOICE' && (
+               <View style={{ flexDirection: 'row', paddingVertical: 4 }}>
+                 <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#475569' }}>Wallet Balance</Text>
+                 <Text style={{ flex: 1, fontSize: 10 * fontScale, color: '#1e293b', fontWeight: 'bold', textAlign: 'right' }}>{currency} {resolvedWalletBalance.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+               </View>
+            )}
+            
+            {type !== 'QUOTATION' && type !== 'SUBSCRIPTION' && (
+              <View style={{ flexDirection: 'row', paddingVertical: 8, backgroundColor: accentColor + '15', marginTop: 8, borderRadius: 4, paddingHorizontal: 8 }}>
+                <Text style={{ flex: 1, fontSize: 11 * fontScale, fontWeight: 'bold', color: accentColor }}>{type === 'INVOICE' && showInvoiceBalances ? 'Outstanding Balance' : 'Balance Due'}</Text>
+                <Text style={{ flex: 1, fontSize: 11 * fontScale, fontWeight: 'bold', color: accentColor, textAlign: 'right' }}>
+                    {currency} {(type === 'INVOICE' && showInvoiceBalances ? resolvedOutstandingBalance : (totalAmount - amountPaid)).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                </Text>
+              </View>
+            )}
+            
+            {type === 'SUBSCRIPTION' && (
+              <View style={{ flexDirection: 'row', paddingVertical: 8, backgroundColor: accentColor + '15', marginTop: 8, borderRadius: 4, paddingHorizontal: 8 }}>
+                <Text style={{ flex: 1, fontSize: 11 * fontScale, fontWeight: 'bold', color: accentColor }}>Recurring Total</Text>
+                <Text style={{ flex: 1, fontSize: 11 * fontScale, fontWeight: 'bold', color: accentColor, textAlign: 'right' }}>
+                    {currency} {totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: 30 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontWeight: '600', fontSize: 12, color: '#1a1a1a', marginBottom: 4 }}>Notes:</Text>
-            <Text style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
-              Payment is due within 30 days of project completion.
-            </Text>
+        {/* Footer info (Notes etc) */}
+        <View style={{ marginTop: 40, flex: 1 }}>
+          {showPaymentTerms && paymentTermsLabel && (
+            <View style={{ marginBottom: 15 }}>
+              <Text style={{ fontSize: 8 * fontScale, fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', marginBottom: 4, letterSpacing: 1 }}>Payment Terms</Text>
+              <Text style={{ fontSize: 10 * fontScale, color: '#475569', lineHeight: 1.4 }}>{paymentTermsLabel}</Text>
+            </View>
+          )}
+          {(!config?.vat?.enabled) && (
+            <View>
+               <Text style={{ fontSize: 9 * fontScale, color: '#94a3b8', fontStyle: 'italic' }}>* Not VAT registered</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Use the standard Security Footer at bottom */}
+        <SecurityFooter
+          data={dataAny}
+          companyName={companyName}
+          legalFooterLine1={legalFooterLine1}
+          legalFooterLine2={legalFooterLine2}
+          fontScale={fontScale}
+        />
+      </Page>
+    </Document>
+  );
+};
+
+const generateSyncQRCodeSvg = (text: string, size: number = 52) => {
+  try {
+    const qr = QRCode.create(text, { errorCorrectionLevel: 'M' });
+    const qrSize = qr.modules.size;
+    const data = qr.modules.data;
+    let pathString = '';
+    for (let row = 0; row < qrSize; row++) {
+      for (let col = 0; col < qrSize; col++) {
+        if (data[row * qrSize + col]) {
+          pathString += `M ${col} ${row} h 1 v 1 h -1 Z `;
+        }
+      }
+    }
+    return (
+      <Svg viewBox={`0 0 ${qrSize} ${qrSize}`} style={{ width: size, height: size }}>
+        <Path d={pathString} fill="#000" />
+      </Svg>
+    );
+  } catch (e) {
+    return <View style={{ width: size, height: size, backgroundColor: '#eeeeee' }} />;
+  }
+};
+
+const ModernInvoiceTemplate = ({
+  type,
+  data,
+  config,
+  templateSettings
+}: {
+  type: string;
+  data: PrimeDocData;
+  config: CompanyConfig | null;
+  templateSettings: ReturnType<typeof resolvePrimeTemplateSettings>;
+}) => {
+  const dataAny = data as any;
+  const fontScale = templateSettings.bodyFontSize / 12;
+
+  // Company Details
+  const companyName = config?.companyName || 'Prime Printing & Stationery';
+  const companyPhone = config?.phone || 'N/A';
+  const companyEmail = config?.email || 'N/A';
+  const currency = config?.currencySymbol || 'K';
+  
+  const logo = templateSettings.showCompanyLogo ? (config?.logoBase64 || COMPANY_LOGO_BASE64) : '';
+  const accentColor = templateSettings.accentColor || '#739F99';
+  const dueDate = dataAny.dueDate;
+
+  let docTitle = 'Invoice';
+  if (type === 'QUOTATION') docTitle = 'Quotation Document';
+  else if (type === 'ORDER' || type === 'SALES_ORDER') docTitle = 'Sales Order';
+  else if (type === 'PO') docTitle = 'Purchase Order';
+  else if (type === 'SUBSCRIPTION') docTitle = 'Recurring Invoice';
+  else if (type === 'INVOICE') docTitle = 'Invoice Service';
+  else {
+    const titleCased = type.toLowerCase().split(/[_\s]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    docTitle = titleCased || 'Document';
+  }
+
+  const titleWords = docTitle.split(' ');
+  const titleFirst = titleWords[0];
+  const titleRest = titleWords.slice(1).join(' ');
+
+  // Invoice Details
+  const invoiceNumber = dataAny.invoiceNumber || dataAny.orderNumber || dataAny.number || '001';
+  const invoiceDate = dataAny.date || new Date().toLocaleDateString();
+  
+  // Recipient Details
+  const resolvedRecipientName = String(
+    dataAny.clientName || dataAny.customerName || dataAny.customer_name || dataAny.schoolName || dataAny.school_name || dataAny.recipientName || dataAny.recipient_name || dataAny.vendorName || dataAny.vendor_name || dataAny.supplierName || dataAny.supplier_name || dataAny.proofOfDelivery?.receivedBy || dataAny.receivedBy || ''
+  ).trim();
+  const resolvedRecipientAddress = String(
+    dataAny.address || dataAny.customerAddress || dataAny.customer_address || dataAny.billingAddress || dataAny.billing_address || dataAny.shippingAddress || dataAny.shipping_address || dataAny.schoolAddress || dataAny.school_address || dataAny.vendorAddress || dataAny.vendor_address || dataAny.supplierAddress || dataAny.supplier_address || dataAny.proofOfDelivery?.address || dataAny.proofOfDelivery?.deliveryLocation || ''
+  ).trim();
+
+  // Financials
+  const items = dataAny.items || [];
+  const subtotal = dataAny.subtotal || 0;
+  const amountPaid = dataAny.amountPaid || 0;
+  const totalAmount = dataAny.totalAmount || subtotal;
+  const tax = dataAny.tax || 0;
+  const discount = dataAny.discount || 0;
+  
+  const showInvoiceBalances = templateSettings.showOutstandingAndWalletBalances;
+  const resolvedOutstandingBalance = Math.max(0, Number(dataAny?.totalAmount || 0) - Number(dataAny?.amountPaid || 0));
+  const outstandingDisplay = showInvoiceBalances && type === 'INVOICE' ? resolvedOutstandingBalance : (totalAmount - amountPaid);
+  const paymentTermsLabel = String(dataAny?.paymentTerms || '').trim() || getDefaultPaymentTermsLabel(config);
+
+  const qrDataText = `${companyName} | ${docTitle} ${invoiceNumber} | Total: ${currency} ${totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+  const renderRow = (item: any, i: number) => {
+    const isService = item.category === 'service' || item.type === 'service' || item.isService === true;
+    let formattedDesc = item.desc || item.name;
+    if (isService) {
+      const totalPages = item.totalPages || item.pages || 0;
+      const copies = item.copies || item.qty || 1;
+      const itemName = item.name || item.desc || 'Service';
+      if (totalPages > 0) {
+        formattedDesc = `${itemName} (${totalPages} pages × ${copies} copies)`;
+      }
+    }
+    
+    const bgColor = i % 2 !== 0 ? '#F5F5F5' : 'transparent';
+      
+    return (
+      <View key={i} style={{ flexDirection: 'row', backgroundColor: bgColor, minHeight: 28, alignItems: 'center', paddingVertical: 6, paddingHorizontal: 4 }}>
+        <Text style={{ flex: 2.2, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333' }}>{formattedDesc}</Text>
+        <Text style={{ width: 60, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333' }}>{item.qty}</Text>
+        <Text style={{ width: 100, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333' }}>
+            {currency} {(item.price || (item.qty ? item.total / item.qty : 0)).toLocaleString('en-US', {minimumFractionDigits: 2})}
+        </Text>
+        <Text style={{ width: 100, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333', textAlign: 'right' }}>
+            {currency} {item.total.toLocaleString('en-US', {minimumFractionDigits: 2})}
+        </Text>
+      </View>
+    );
+  };
+
+  return (
+    <Document title={`${docTitle} ${invoiceNumber}`} author={companyName}>
+      <Page size="A4" style={{ paddingVertical: 45, paddingHorizontal: 40, fontFamily: templateSettings.fontFamily, backgroundColor: '#FFFFFF' }}>
+        
+{/* Centered Logo & Company Header */}
+        <View style={{ alignItems: 'center', marginBottom: 1.5 }}>
+          {logo ? (
+             <Image src={logo} style={{ width: templateSettings.logoWidth, height: templateSettings.logoWidth, objectFit: 'contain' }} />
+           ) : (
+             <View style={{ width: templateSettings.logoWidth, height: templateSettings.logoWidth, borderRadius: templateSettings.logoWidth / 2, backgroundColor: '#222222', alignItems: 'center', justifyContent: 'center' }}>
+               <Text style={{ color: '#ffffff', fontSize: templateSettings.logoWidth * 0.4, fontWeight: 'bold' }}>{companyName.charAt(0)}</Text>
+             </View>
+           )}
+        </View>
+
+        {/* Invoice Huge Title */}
+        <View style={{ alignItems: 'center', marginBottom: 2 }}>
+          <Text style={{ fontSize: 48 * fontScale, color: '#111111' }}>
+            <Text style={{ fontWeight: 'heavy' }}>{titleFirst}</Text>
+            {titleRest && <Text style={{ fontStyle: 'italic', fontWeight: 'normal', color: '#333333' }}> {titleRest}</Text>}
+          </Text>
+        </View>
+
+        {/* Info Row: Number / Date */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 30, marginBottom: 40 }}>
+          <Text style={{ fontSize: 12 * fontScale, color: '#222222' }}>
+            <Text style={{ fontWeight: 'bold' }}>{type === 'INVOICE' ? 'Invoice Number:' : 'Reference Number:'}</Text> {invoiceNumber}
+          </Text>
+          <Text style={{ fontSize: 12 * fontScale, color: '#222222' }}>
+            <Text style={{ fontWeight: 'bold' }}>{type === 'INVOICE' ? 'Invoice Date:' : 'Date:'}</Text> {invoiceDate}
+          </Text>
+        </View>
+
+        {/* Columns: Payment Info vs Bill To */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 }}>
+          <View style={{ flex: 1, paddingRight: 20 }}>
+            <View style={{ backgroundColor: accentColor, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start', marginBottom: 12, minWidth: 150 }}>
+              <Text style={{ color: '#ffffff', fontSize: 10 * fontScale, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 }}>COMPANY INFO</Text>
+            </View>
+            {companyPhone !== 'N/A' && <Text style={{ fontSize: 11 * fontScale, color: '#333333', marginBottom: 3 }}>{companyPhone}</Text>}
+            {companyEmail !== 'N/A' && <Text style={{ fontSize: 11 * fontScale, color: '#333333', marginBottom: 3 }}>{companyEmail}</Text>}
           </View>
+          
           <View style={{ flex: 1 }}>
-            <View style={{ width: '100%' }}>
-              <View style={{ flexDirection: 'row' }}>
-                <Text style={{ padding: 5, flex: 1, fontSize: 12, color: '#555' }}>Tax</Text>
-                <Text style={{ padding: 5, flex: 1, fontSize: 12, textAlign: 'right' }}>{currency} {tax.toFixed(2)}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', backgroundColor: templateSettings.accentColor || '#5a9e96', borderRadius: 3 }}>
-                <Text style={{ padding: 6, flex: 1, fontSize: 12, fontWeight: '600', color: '#fff' }}>Grand Total</Text>
-                <Text style={{ padding: 6, flex: 1, fontSize: 12, fontWeight: '600', color: '#fff', textAlign: 'right' }}>{currency} {grandTotal.toFixed(2)}</Text>
-              </View>
+            <View style={{ backgroundColor: accentColor, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-end', marginBottom: 12, minWidth: 150 }}>
+              <Text style={{ color: '#ffffff', fontSize: 10 * fontScale, fontWeight: 'bold', textAlign: 'right', textTransform: 'uppercase', letterSpacing: 1 }}>BILL TO</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 12 * fontScale, fontWeight: 'bold', color: '#111111', marginBottom: 4 }}>{resolvedRecipientName}</Text>
+              {resolvedRecipientAddress && <Text style={{ fontSize: 11 * fontScale, color: '#333333', textAlign: 'right', lineHeight: 1.4 }}>{resolvedRecipientAddress}</Text>}
             </View>
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', marginTop: 40, paddingTop: 20, borderTopWidth: 0.5, borderTopColor: '#e0e0e0', gap: 20 }}>
-          <View style={{ width: 56, height: 56, backgroundColor: '#f5f5f5', borderWidth: 0.5, borderColor: '#ddd', borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 10, color: '#aaa' }}>QR</Text>
+        {/* Table representation */}
+        <View style={{ marginBottom: 15 }}>
+          <View style={{ flexDirection: 'row', backgroundColor: accentColor, paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center' }}>
+            <Text style={{ flex: 2.2, paddingHorizontal: 4, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#ffffff' }}>Item Description</Text>
+            <Text style={{ width: 60, paddingHorizontal: 4, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#ffffff' }}>Qty.</Text>
+            <Text style={{ width: 100, paddingHorizontal: 4, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#ffffff' }}>Unit Price</Text>
+            <Text style={{ width: 100, paddingHorizontal: 4, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#ffffff', textAlign: 'right' }}>Amount</Text>
           </View>
+          {items.map(renderRow)}
+          
+          {/* Total Payment Gray Row */}
+          <View style={{ flexDirection: 'row', backgroundColor: '#D9DEDE', paddingVertical: 8, paddingHorizontal: 4, alignItems: 'center', marginTop: 4 }}>
+            <Text style={{ flex: 2.2, paddingHorizontal: 4, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#111111' }}>Total Payment</Text>
+            <Text style={{ width: 60, paddingHorizontal: 4, fontSize: 11 * fontScale, color: '#111111' }}>-</Text>
+            <Text style={{ width: 100, paddingHorizontal: 4, fontSize: 11 * fontScale, color: '#111111' }}>-</Text>
+            <Text style={{ width: 100, paddingHorizontal: 4, fontSize: 11 * fontScale, fontWeight: 'bold', color: '#111111', textAlign: 'right' }}>{currency} {subtotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 15 }}>
+          {/* Notes Bottom Left */}
+          <View style={{ width: 200 }}>
+             {dataAny.notes && (
+                <View style={{ marginTop: 10 }}>
+                   <Text style={{ fontSize: 12 * fontScale, fontWeight: 'bold', color: '#111111', marginBottom: 6 }}>Notes:</Text>
+                   <Text style={{ fontSize: 10 * fontScale, color: '#333333', lineHeight: 1.5 }}>{dataAny.notes}</Text>
+                   <View style={{ width: '100%', height: 1, backgroundColor: '#111111', marginTop: 15 }} />
+                </View>
+             )}
+          </View>
+
+          {/* Totals Section */}
+          <View style={{ width: 220 }}>
+            {tax > 0 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingRight: 4 }}>
+                <Text style={{ color: '#333333', fontSize: 11 * fontScale }}>Tax</Text>
+                <Text style={{ color: '#333333', fontSize: 11 * fontScale }}>{currency} {tax.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+              </View>
+            )}
+            {discount > 0 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingRight: 4 }}>
+                <Text style={{ color: '#333333', fontSize: 11 * fontScale }}>Discount</Text>
+                <Text style={{ color: '#333333', fontSize: 11 * fontScale }}>-{currency} {discount.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+              </View>
+            )}
+            {amountPaid > 0 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingRight: 4 }}>
+                <Text style={{ color: '#333333', fontSize: 11 * fontScale }}>Amount Paid</Text>
+                <Text style={{ color: '#333333', fontSize: 11 * fontScale }}>-{currency} {amountPaid.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#Dce1e1', paddingVertical: 8, paddingHorizontal: 6, marginTop: 4 }}>
+              <Text style={{ color: '#111111', fontWeight: 'bold', fontSize: 12 * fontScale }}>
+                {type === 'INVOICE' && showInvoiceBalances ? 'Outstanding' : 'Grand Total'}
+              </Text>
+              <Text style={{ color: '#111111', fontWeight: 'bold', fontSize: 12 * fontScale }}>
+                {currency} {(type === 'INVOICE' && showInvoiceBalances ? resolvedOutstandingBalance : (totalAmount - amountPaid)).toLocaleString('en-US', {minimumFractionDigits: 2})}
+              </Text>
+            </View>
+            
+            {showInvoiceBalances && type === 'INVOICE' && (
+               <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, paddingRight: 4, marginTop: 4 }}>
+                 <Text style={{ color: '#333333', fontSize: 10 * fontScale }}>Wallet Balance</Text>
+                 <Text style={{ color: '#333333', fontSize: 10 * fontScale }}>{currency} {(Number(dataAny.walletBalance) || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+               </View>
+            )}
+          </View>
+        </View>
+
+        {/* Footer info (QR and Signature) */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 40, flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ marginRight: 15 }}>
+               {generateSyncQRCodeSvg(qrDataText, 64)}
+            </View>
+            <View style={{ justifyContent: 'center' }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 11 * fontScale, color: '#111111', marginBottom: 4 }}>More Info:</Text>
+              {companyPhone !== 'N/A' && <Text style={{ fontSize: 10 * fontScale, color: '#333333', marginBottom: 2 }}>{companyPhone}</Text>}
+              {companyEmail !== 'N/A' && <Text style={{ fontSize: 10 * fontScale, color: '#333333' }}>{companyEmail}</Text>}
+            </View>
+          </View>
+
+          <View style={{ alignItems: 'center', minWidth: 160 }}>
+            <Text style={{ fontSize: 11 * fontScale, color: '#222222', marginBottom: 10 }}>{dueDate ? `Due Date: ${dueDate}` : `Date: ${invoiceDate}`}</Text>
+            <View style={{ width: '100%', height: 40, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{fontFamily: 'Times-Roman', fontStyle: 'italic', fontSize: 26, color: '#111111'}}>{companyName.split(' ')[0]}</Text>
+            </View>
+            <View style={{ width: '100%', height: 1.5, backgroundColor: '#444444', marginTop: 10, marginBottom: 8 }} />
+          </View>
+        </View>
+
+      </Page>
+    </Document>
+  );
+};
+
+const ProfessionalInvoiceTemplate = ({
+  type,
+  data,
+  config,
+  templateSettings
+}: {
+  type: string;
+  data: PrimeDocData;
+  config: CompanyConfig | null;
+  templateSettings: ReturnType<typeof resolvePrimeTemplateSettings>;
+}) => {
+  const dataAny = data as any;
+  const fontScale = templateSettings.bodyFontSize / 12;
+
+  // Company Details
+  const companyName = config?.companyName || 'Prime Printing & Stationery';
+  const companyAddress = config?.addressLine1 || 'Lilongwe, Malawi';
+  const rawPhone = config?.phone || '';
+  const formattedPhone = rawPhone.replace(/(\+265\s?\d{3}\s?\d{3}\s?\d{3})(?=\+265)/g, '$1 | ');
+  const companyPhone = formattedPhone || 'N/A';
+  const companyEmail = config?.email || 'N/A';
+  const currency = config?.currencySymbol || 'K';
+  
+  const logo = templateSettings.showCompanyLogo ? (config?.logoBase64 || COMPANY_LOGO_BASE64) : '';
+  const accentColor = templateSettings.accentColor || '#E8450A';
+
+  let docTitle = 'INVOICE';
+  if (type === 'QUOTATION') docTitle = 'QUOTATION';
+  else if (type === 'ORDER' || type === 'SALES_ORDER') docTitle = 'SALES ORDER';
+  else if (type === 'PO') docTitle = 'PURCHASE ORDER';
+  else if (type === 'SUBSCRIPTION') docTitle = 'RECURRING INVOICE';
+
+  // Invoice Details
+  const invoiceNumber = dataAny.invoiceNumber || dataAny.orderNumber || dataAny.number || '001';
+  const invoiceDate = dataAny.date || new Date().toLocaleDateString();
+  const dueDate = dataAny.dueDate;
+  
+  // Recipient Details
+  const resolvedRecipientName = String(
+    dataAny.clientName || dataAny.customerName || dataAny.customer_name || dataAny.schoolName || dataAny.school_name || dataAny.recipientName || dataAny.recipient_name || dataAny.vendorName || dataAny.vendor_name || dataAny.supplierName || dataAny.supplier_name || dataAny.proofOfDelivery?.receivedBy || dataAny.receivedBy || ''
+  ).trim();
+  const resolvedRecipientAddress = String(
+    dataAny.address || dataAny.customerAddress || dataAny.customer_address || dataAny.billingAddress || dataAny.billing_address || dataAny.shippingAddress || dataAny.shipping_address || dataAny.schoolAddress || dataAny.school_address || dataAny.vendorAddress || dataAny.vendor_address || dataAny.supplierAddress || dataAny.supplier_address || dataAny.proofOfDelivery?.address || dataAny.proofOfDelivery?.deliveryLocation || ''
+  ).trim();
+
+  // Financials
+  const items = dataAny.items || [];
+  const subtotal = dataAny.subtotal || 0;
+  const amountPaid = dataAny.amountPaid || 0;
+  const totalAmount = dataAny.totalAmount || subtotal;
+  const tax = dataAny.tax || 0;
+  const discount = dataAny.discount || 0;
+  
+  const showInvoiceBalances = templateSettings.showOutstandingAndWalletBalances;
+  const resolvedOutstandingBalance = Math.max(0, Number(dataAny?.totalAmount || 0) - Number(dataAny?.amountPaid || 0));
+  const outstandingDisplay = showInvoiceBalances && type === 'INVOICE' ? resolvedOutstandingBalance : (totalAmount - amountPaid);
+  
+  const renderRow = (item: any, i: number) => {
+    const isService = item.category === 'service' || item.type === 'service' || item.isService === true;
+    let formattedDesc = item.desc || item.name;
+    if (isService) {
+      const totalPages = item.totalPages || item.pages || 0;
+      const copies = item.copies || item.qty || 1;
+      const itemName = item.name || item.desc || 'Service';
+      if (totalPages > 0) {
+        formattedDesc = `${itemName} (${totalPages} pages × ${copies} copies)`;
+      }
+    }
+      
+    return (
+      <View key={i} style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#eeeeee', minHeight: 24, alignItems: 'center', paddingVertical: 5 }}>
+        <Text style={{ flex: 2.2, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333' }}>{formattedDesc}</Text>
+        <Text style={{ width: 50, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333', textAlign: 'right' }}>{item.qty}</Text>
+        <Text style={{ width: 80, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333', textAlign: 'right' }}>{currency} {(item.price || (item.qty ? item.total / item.qty : 0)).toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+        <Text style={{ width: 80, paddingHorizontal: 4, fontSize: 10 * fontScale, color: '#333333', textAlign: 'right' }}>{currency} {item.total.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+      </View>
+    );
+  };
+
+  return (
+    <Document title={`${docTitle} ${invoiceNumber}`} author={companyName}>
+      <Page size="A4" style={{ padding: 40, fontFamily: templateSettings.fontFamily, backgroundColor: '#ffffff' }}>
+        {/* Top Row */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 30 }}>
+          <View style={{ width: templateSettings.logoWidth, height: templateSettings.logoWidth, backgroundColor: '#222222', alignItems: 'center', justifyContent: 'center' }}>
+            {logo ? (
+              <Image src={logo} style={{ width: templateSettings.logoWidth * 0.8, height: templateSettings.logoWidth * 0.8, objectFit: 'contain' }} />
+            ) : (
+              <Text style={{ color: '#ffffff', fontSize: templateSettings.logoWidth * 0.4, fontWeight: 'bold' }}>{companyName.charAt(0)}</Text>
+            )}
+          </View>
+          <View style={{ textAlign: 'right', alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 13 * fontScale, fontWeight: 'bold', color: '#111111', marginBottom: 2 }}>{companyName}</Text>
+            <Text style={{ fontSize: 10 * fontScale, color: '#444444', lineHeight: 1.4 }}>{companyAddress}</Text>
+            <Text style={{ fontSize: 10 * fontScale, color: '#444444', lineHeight: 1.4 }}>{companyPhone}</Text>
+            {companyEmail !== 'N/A' && <Text style={{ fontSize: 10 * fontScale, color: '#444444', lineHeight: 1.4 }}>{companyEmail}</Text>}
+          </View>
+        </View>
+
+        {/* Main Row / Client Info */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 25 }}>
+          <View>
+            <Text style={{ fontSize: 9 * fontScale, color: '#999999', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 4 }}>Client</Text>
+            <Text style={{ fontSize: 14 * fontScale, fontWeight: 'bold', color: '#111111', marginBottom: 2 }}>{resolvedRecipientName}</Text>
+            {resolvedRecipientAddress && <Text style={{ fontSize: 10 * fontScale, color: '#444444', lineHeight: 1.4 }}>{resolvedRecipientAddress}</Text>}
+          </View>
+          <View>
+            <Text style={{ fontSize: 32 * fontScale, fontWeight: 'bold', color: '#cccccc', letterSpacing: 2 }}>{docTitle}</Text>
+          </View>
+        </View>
+
+        {/* Due Row */}
+        <View style={{ flexDirection: 'row', alignItems: 'stretch', marginBottom: 25 }}>
+          <View style={{ backgroundColor: accentColor, paddingVertical: 12, paddingHorizontal: 16, flex: 1, justifyContent: 'center' }}>
+            {type !== 'QUOTATION' && type !== 'SUBSCRIPTION' ? (
+              <Text style={{ fontSize: 16 * fontScale, fontWeight: 'bold', color: '#ffffff', letterSpacing: 1 }}>
+                {type === 'INVOICE' && showInvoiceBalances ? 'OUTSTANDING' : 'DUE'} — {currency} {outstandingDisplay.toLocaleString('en-US', {minimumFractionDigits: 2})}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 16 * fontScale, fontWeight: 'bold', color: '#ffffff', letterSpacing: 1 }}>
+                TOTAL — {currency} {totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}
+              </Text>
+            )}
+          </View>
+          <View style={{ backgroundColor: '#ffffff', borderWidth: 1, borderColor: accentColor, paddingVertical: 10, paddingHorizontal: 14, minWidth: 160, justifyContent: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={{ color: '#999999', fontSize: 10 * fontScale }}>Date</Text>
+              <Text style={{ fontSize: 10 * fontScale, color: '#444444' }}>{invoiceDate}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ color: '#999999', fontSize: 10 * fontScale }}>Ref #</Text>
+              <Text style={{ fontSize: 10 * fontScale, color: '#444444' }}>{invoiceNumber}</Text>
+            </View>
+            {dueDate && (
+               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                 <Text style={{ color: '#999999', fontSize: 10 * fontScale }}>Due</Text>
+                 <Text style={{ fontSize: 10 * fontScale, color: '#444444' }}>{dueDate}</Text>
+               </View>
+            )}
+          </View>
+        </View>
+
+        {/* Table representation */}
+        <View style={{ marginBottom: 15 }}>
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1.5, borderBottomColor: '#222222', paddingBottom: 6 }}>
+            <Text style={{ flex: 2.2, paddingHorizontal: 4, fontSize: 9 * fontScale, fontWeight: 'bold', color: '#666666', letterSpacing: 1, textTransform: 'uppercase' }}>Item Description</Text>
+            <Text style={{ width: 50, paddingHorizontal: 4, fontSize: 9 * fontScale, fontWeight: 'bold', color: '#666666', letterSpacing: 1, textTransform: 'uppercase', textAlign: 'right' }}>Qty</Text>
+            <Text style={{ width: 80, paddingHorizontal: 4, fontSize: 9 * fontScale, fontWeight: 'bold', color: '#666666', letterSpacing: 1, textTransform: 'uppercase', textAlign: 'right' }}>Unit</Text>
+            <Text style={{ width: 80, paddingHorizontal: 4, fontSize: 9 * fontScale, fontWeight: 'bold', color: '#666666', letterSpacing: 1, textTransform: 'uppercase', textAlign: 'right' }}>Price</Text>
+          </View>
+          {items.map(renderRow)}
+        </View>
+
+        {/* Totals Section */}
+        <View style={{ alignSelf: 'flex-end', width: 220, marginBottom: 25 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+            <Text style={{ color: '#999999', fontSize: 10 * fontScale }}>Sub Total —</Text>
+            <Text style={{ color: '#555555', fontSize: 10 * fontScale }}>{currency} {subtotal.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+          </View>
+          {tax > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+              <Text style={{ color: '#999999', fontSize: 10 * fontScale }}>Tax —</Text>
+              <Text style={{ color: '#555555', fontSize: 10 * fontScale }}>{currency} {tax.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+            </View>
+          )}
+          {discount > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+              <Text style={{ color: '#999999', fontSize: 10 * fontScale }}>Discount —</Text>
+              <Text style={{ color: '#555555', fontSize: 10 * fontScale }}>-{currency} {discount.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+            </View>
+          )}
+          {amountPaid > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 }}>
+              <Text style={{ color: '#999999', fontSize: 10 * fontScale }}>Amount Paid —</Text>
+              <Text style={{ color: '#555555', fontSize: 10 * fontScale }}>-{currency} {amountPaid.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 3, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: '#dddddd' }}>
+            <Text style={{ color: accentColor, fontWeight: 'bold', fontSize: 12 * fontScale }}>Total Grand —</Text>
+            <Text style={{ color: accentColor, fontWeight: 'bold', fontSize: 12 * fontScale }}>{currency} {totalAmount.toLocaleString('en-US', {minimumFractionDigits: 2})}</Text>
+          </View>
+        </View>
+
+        {/* Bottom Row */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 15, paddingTop: 20, borderTopWidth: 0.5, borderTopColor: '#eeeeee', flex: 1 }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 11, fontWeight: '600', color: '#1a1a1a', marginBottom: 2 }}>More Info:</Text>
-            <Text style={{ fontSize: 11, color: '#555' }}>{companyPhone}{'\n'}{companyEmail}</Text>
+            {dataAny.notes && (
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 9 * fontScale, fontWeight: 'bold', color: '#999999', textTransform: 'uppercase', marginBottom: 4, letterSpacing: 1 }}>Notes</Text>
+                <Text style={{ fontSize: 10 * fontScale, color: '#444444', lineHeight: 1.4 }}>{dataAny.notes}</Text>
+              </View>
+            )}
+            <View style={{ marginTop: 'auto' }}>
+              <Text style={{ fontStyle: 'italic', fontSize: 15 * fontScale, color: '#555555', marginBottom: 4, fontFamily: 'Times-Roman' }}>{companyName}</Text>
+              <Text style={{ fontWeight: 'bold', fontSize: 10 * fontScale, color: '#111111' }}>{companyName}</Text>
+              <Text style={{ fontSize: 9 * fontScale, color: accentColor, letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>Authorized Signatory</Text>
+            </View>
           </View>
+
+          <View style={{ flex: 1, alignItems: 'flex-end', textAlign: 'right' }}>
+            {templateSettings.showPaymentTerms && config?.transactionSettings?.defaultPaymentTermsDays !== undefined && (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ fontSize: 9 * fontScale, fontWeight: 'bold', color: '#999999', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 }}>Payment Method / Terms</Text>
+                <Text style={{ fontSize: 9 * fontScale, color: '#666666', lineHeight: 1.6 }}>{getDefaultPaymentTermsLabel(config)}</Text>
+              </View>
+            )}
+            
+            <Text style={{ fontSize: 9 * fontScale, color: '#aaaaaa', lineHeight: 1.5, maxWidth: 200, marginTop: 6 }}>
+              This is a computer-generated document. All accounts are subject to our terms of service.
+            </Text>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={{ marginTop: 25, paddingTop: 15, borderTopWidth: 0.5, borderTopColor: '#eeeeee', alignItems: 'center' }}>
+          <Text style={{ color: accentColor, fontSize: 10 * fontScale, fontWeight: 'bold', letterSpacing: 2, textTransform: 'uppercase' }}>
+            Thanks for business with us!
+          </Text>
         </View>
       </Page>
     </Document>
@@ -332,8 +913,16 @@ export const PrimeDocument = ({ type, data, configOverride = null }: DocProps) =
   const config = configOverride || getStoredCompanyConfig();
   const templateSettings = resolvePrimeTemplateSettings(config);
 
-  if (type === 'INVOICE' && templateSettings.engine === 'Clean') {
-    return <CleanInvoiceTemplate data={data as PrimeDocData} config={config} templateSettings={templateSettings} />;
+  if (isFinancial && templateSettings.engine === 'Clean') {
+    return <CleanInvoiceTemplate type={type} data={data as PrimeDocData} config={config} templateSettings={templateSettings} />;
+  }
+
+  if (isFinancial && templateSettings.engine === 'Professional') {
+    return <ProfessionalInvoiceTemplate type={type} data={data as PrimeDocData} config={config} templateSettings={templateSettings} />;
+  }
+
+  if (isFinancial && templateSettings.engine === 'Modern') {
+    return <ModernInvoiceTemplate type={type} data={data as PrimeDocData} config={config} templateSettings={templateSettings} />;
   }
 
   const fontScale = templateSettings.bodyFontSize / 12;

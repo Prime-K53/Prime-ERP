@@ -195,6 +195,7 @@ export interface BuildPosReceiptDocInput {
   customerName?: string;
   itemDescriptionFormatter?: (item: any) => string;
   footerMessage?: string;
+  companyConfig?: any;
 }
 
 export const buildPosReceiptDoc = ({
@@ -202,7 +203,8 @@ export const buildPosReceiptDoc = ({
   cashierName,
   customerName,
   itemDescriptionFormatter,
-  footerMessage
+  footerMessage,
+  companyConfig
 }: BuildPosReceiptDocInput) => {
   const totalPaid = round2(
     (sale.payments && sale.payments.length > 0)
@@ -216,8 +218,8 @@ export const buildPosReceiptDoc = ({
 
   return {
     receiptNumber: sale.id,
-    date: new Date(sale.date).toLocaleString(),
-    cashierName,
+    date: toDisplayDate(sale.date),
+    cashierName: cashierName || 'Cashier',
     customerName: customerName || sale.customerName || 'Walk-in Customer',
     items: (sale.items || []).map((item: any) => ({
       desc: itemDescriptionFormatter ? itemDescriptionFormatter(item) : (item.name || item.productName || 'Item'),
@@ -237,7 +239,15 @@ export const buildPosReceiptDoc = ({
       amount: round2(Number(payment.amount || 0)),
       accountId: payment.accountId
     })),
-    footerMessage
+    footerMessage: footerMessage || companyConfig?.transactionSettings?.pos?.receiptFooter,
+    companyInfo: {
+      name: companyConfig?.companyName || 'Prime ERP',
+      address: companyConfig?.addressLine1 || '',
+      phone: companyConfig?.phone || '',
+      email: companyConfig?.email || '',
+      website: companyConfig?.website || '',
+      footerMessage: footerMessage || companyConfig?.transactionSettings?.pos?.receiptFooter
+    }
   };
 };
 

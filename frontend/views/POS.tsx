@@ -64,7 +64,8 @@ const POS: React.FC = () => {
       cashierName: sale.cashierId === user?.id ? (user?.name || 'Cashier') : (sale.cashierId || user?.name || 'Cashier'),
       customerName: sale.customerName || 'Walk-in Customer',
       itemDescriptionFormatter: formatServiceDescription,
-      footerMessage: getPosReceiptFooter()
+      footerMessage: getPosReceiptFooter(),
+      companyConfig
     });
 
     const parsed = PosReceiptSchema.safeParse(receipt);

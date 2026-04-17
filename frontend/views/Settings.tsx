@@ -530,13 +530,7 @@ const Settings: React.FC = () => {
     const activeGroupTitle = menuGroups.find(g => g.items.some(i => i.id === activeTab))?.title || 'Settings';
     const activeItemLabel = menuGroups.flatMap(g => g.items).find(i => i.id === activeTab)?.label || activeTab;
     const normalizedTemplateSettings = resolvePrimeTemplateSettings(config);
-    const deferredTemplatePreviewConfig = useDeferredValue({
-        ...config,
-        invoiceTemplates: {
-            ...(config.invoiceTemplates || {}),
-            ...normalizedTemplateSettings
-        } as any
-    });
+    const deferredTemplatePreviewConfig = useDeferredValue(config);
 
     return (
         <div className="h-full flex flex-col bg-[#F4F5F8] overflow-hidden font-sans">

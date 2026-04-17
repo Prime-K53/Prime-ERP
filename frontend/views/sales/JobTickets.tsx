@@ -13,6 +13,7 @@ import { useData } from '../../context/DataContext';
 import { useDocumentStore } from '../../stores/documentStore';
 import { isStoredFileIdentifier } from '../../utils/documentPreview';
 import html2canvas from 'html2canvas';
+import QRCode from 'qrcode';
 
 const statusConfig: Record<JobTicketStatus, { label: string; color: string; icon: React.ReactNode }> = {
   Received: { label: 'Received', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: <Package size={14} /> },
@@ -377,142 +378,15 @@ export const JobTickets: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredTickets.map((ticket) => {
             const timeRemaining = getTimeRemaining(ticket.dueDate);
-            const isOverdue = ticket.status !== 'Delivered' && ticket.status !== 'Cancelled' && 
-              ticket.dueDate && new Date(ticket.dueDate) < new Date();
-            
             return (
-              <div
+              <JobTicketCard
                 key={ticket.id}
-                id={`ticket-card-${ticket.id}`}
-                className={`bg-white rounded-2xl border border-slate-200/60 overflow-hidden hover:border-blue-400 hover:shadow-2xl hover:shadow-blue-600/10 transition-all duration-500 group cursor-pointer relative flex flex-col`}
+                ticket={ticket}
+                currency={currency}
+                timeRemaining={timeRemaining}
                 onClick={() => setSelectedTicket(ticket)}
-              >
-                {/* Priority Indicator Strip */}
-                <div className={`h-1.5 w-full ${
-                  ticket.priority === 'Urgent' ? 'bg-red-500' :
-                  ticket.priority === 'Express' ? 'bg-orange-500' :
-                  ticket.priority === 'Rush' ? 'bg-amber-500' :
-                  'bg-blue-500'
-                }`} />
-
-                {/* Card Header - Company & ID */}
-                <div className="px-5 py-4 bg-slate-50/50 border-b border-slate-100 flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest mb-1 truncate">
-                      {companyName}
-                    </p>
-                    <div className="flex items-center gap-2">
-                       <h3 className="font-semibold text-slate-800 text-[18px] leading-[1.4] tracking-tight">{ticket.ticketNumber}</h3>
-                       {ticket.batchReference && (
-                         <span className="px-[6px] py-[1px] bg-blue-50 text-blue-700 text-[12px] font-semibold rounded border border-blue-100/50">
-                           Batch: {ticket.batchReference}
-                         </span>
-                       )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                     <span className={`px-[8px] py-[2px] rounded-full text-[12px] font-semibold uppercase tracking-wider ${statusConfig[ticket.status].color} border`}>
-                      {statusConfig[ticket.status].label}
-                    </span>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleExportCard(ticket);
-                        }}
-                        className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-all shadow-sm"
-                        title="Export as Image"
-                      >
-                        <ImageIcon size={12} className="text-slate-600" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Body */}
-                <div className="p-5 flex-1 flex flex-col">
-                  {/* Customer Information */}
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500 border border-slate-200">
-                      <User size={18} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-1">Customer</p>
-                      <p className="font-semibold text-slate-800 text-[14px] truncate leading-tight">
-                        {ticket.customerName}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div className="mb-4">
-                    <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Job Description</p>
-                    <p className="text-slate-600 text-[13.5px] line-clamp-2 leading-[1.5] font-normal">
-                      {ticket.description}
-                    </p>
-                  </div>
-
-                  {/* Technical Specs Grid */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-slate-100 rounded-lg text-slate-500">
-                        {typeConfig[ticket.type].icon}
-                      </div>
-                      <div>
-                        <p className="text-[12px] font-semibold text-slate-400 uppercase leading-none mb-1">Job Type</p>
-                        <p className="text-[13px] font-semibold text-slate-700">{typeConfig[ticket.type].label}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-slate-100 rounded-lg text-slate-500">
-                        <Package size={12} />
-                      </div>
-                      <div>
-                        <p className="text-[12px] font-semibold text-slate-400 uppercase leading-none mb-1">Quantity</p>
-                        <p className="text-[13px] font-semibold text-slate-700">{ticket.quantity} {ticket.paperSize}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Time Remaining / Priority */}
-                  <div className="mt-auto flex items-center justify-between py-3 border-t border-slate-100/60">
-                    <div className="flex items-center gap-2">
-                       <div className={`w-2 h-2 rounded-full ${
-                         ticket.priority === 'Normal' ? 'bg-slate-300' :
-                         ticket.priority === 'Rush' ? 'bg-amber-400' :
-                         'bg-red-500 animate-pulse'
-                       }`} />
-                       <span className="text-[10px] font-bold text-slate-500">{ticket.priority} Priority</span>
-                    </div>
-                    {ticket.dueDate && (
-                      <div className={`flex items-center gap-1.5 text-[10px] font-black ${timeRemaining?.className || 'text-slate-500'}`}>
-                        <Clock size={12} />
-                        {timeRemaining?.text || 'DUE'}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Progress Bar (if processing) */}
-                  {ticket.status === 'Processing' && (
-                    <div className="mt-2">
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-blue-600 rounded-full transition-all duration-700 ease-out" 
-                          style={{ width: `${ticket.progressPercent}%` }} 
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Footer - Final Total */}
-                <div className="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Grand Total</span>
-                  <span className="text-[18px] font-semibold text-slate-900 leading-none tabular-nums">
-                    {currency}{ticket.total.toLocaleString()}
-                  </span>
-                </div>
-              </div>
+                onExport={() => handleExportCard(ticket)}
+              />
             );
           })}
         </div>
@@ -543,6 +417,168 @@ export const JobTickets: React.FC = () => {
     </div>
   );
 };
+
+interface JobTicketCardProps {
+  ticket: JobTicket;
+  currency: string;
+  timeRemaining: { text: string; className?: string } | null;
+  onClick: () => void;
+  onExport: () => void;
+}
+
+const JobTicketCard: React.FC<JobTicketCardProps> = ({ ticket, currency, timeRemaining, onClick, onExport }) => {
+  const { companyConfig } = useData();
+  const companyName = (companyConfig?.companyName || 'PRIME PRINTING').toUpperCase();
+  const [qrSrc, setQrSrc] = useState<string>('');
+
+  useEffect(() => {
+    const qrData = `${companyConfig?.companyName || 'Prime'} | Ticket #${ticket.ticketNumber} | ${ticket.customerName} | Total: ${currency}${ticket.total}`;
+    QRCode.toDataURL(qrData, {
+      width: 140,
+      margin: 1,
+      color: {
+        dark: '#2d4538',
+        light: '#ffffff'
+      }
+    }).then(setQrSrc).catch(console.error);
+  }, [ticket, currency, companyConfig]);
+
+  return (
+    <div
+      id={`ticket-card-${ticket.id}`}
+      onClick={onClick}
+      className="group relative bg-white rounded-[24px] overflow-hidden border border-slate-200/60 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-500 cursor-pointer h-[460px] flex flex-col"
+    >
+      {/* Brand Swoosh Ornament */}
+      <div className="absolute top-0 right-0 w-48 h-48 -mr-16 -mt-16 bg-gradient-to-br from-blue-600/10 to-blue-500/0 rounded-full blur-3xl group-hover:from-blue-600/20 transition-all duration-700" />
+      <div className="absolute top-[-20%] right-[-10%] w-[160px] h-[160px] bg-blue-600/5 rounded-full border-[1.5px] border-blue-600/10 pointer-events-none" />
+      <div className="absolute top-[-25%] right-[-15%] w-[220px] h-[220px] bg-blue-600/3 rounded-full border-[1.5px] border-blue-600/5 pointer-events-none" />
+      
+      {/* Header with High-Fidelity Badge */}
+      <div className="relative px-6 pt-7 pb-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)] ${
+                ticket.status === 'Received' ? 'bg-blue-500 animate-pulse' :
+                ticket.status === 'Processing' ? 'bg-amber-500 animate-pulse' :
+                ticket.status === 'Ready' ? 'bg-emerald-500' :
+                ticket.status === 'Delivered' ? 'bg-slate-400' :
+                'bg-red-500'
+              }`} />
+              <span className="text-[11px] font-black text-slate-400 uppercase tracking-[0.1em]">
+                {statusConfig[ticket.status].label}
+              </span>
+            </div>
+            <h3 className="text-[20px] font-black text-slate-800 leading-tight tracking-tight group-hover:text-blue-600 transition-colors">
+              #{ticket.ticketNumber}
+            </h3>
+          </div>
+          <button 
+            onClick={(e) => { e.stopPropagation(); onExport(); }}
+            className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-lg transition-all"
+          >
+            <Share2 size={16} />
+          </button>
+        </div>
+
+        {/* Customer & Info Pill */}
+        <div className="flex items-center gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50">
+          <div className="w-11 h-11 bg-white rounded-xl shadow-sm border border-slate-200/40 flex items-center justify-center">
+            <User size={20} className="text-blue-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-[14px] font-bold text-slate-800 truncate mb-0.5">{ticket.customerName}</h4>
+            <p className="text-[12px] font-medium text-slate-500">+{ticket.customerPhone || 'Walk-in'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 px-6 py-4 flex flex-col bg-white">
+        {/* Description */}
+        <div className="mb-6">
+          <p className="text-[13px] font-medium text-slate-600 leading-[1.6] line-clamp-2 italic opacity-80">
+            "{ticket.description}"
+          </p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Production Type</span>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-blue-50 rounded flex items-center justify-center">
+                <Printer size={12} className="text-blue-600" />
+              </div>
+              <span className="text-[13px] font-bold text-slate-700">{typeConfig[ticket.type].label}</span>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Volume</span>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-amber-50 rounded flex items-center justify-center">
+                <Package size={12} className="text-amber-600" />
+              </div>
+              <span className="text-[13px] font-bold text-slate-700">{ticket.quantity.toLocaleString()} Units</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Due Date Indicator */}
+        <div className="flex items-center justify-between mt-auto pt-6 border-t border-slate-100/80">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20">
+              <Calendar size={14} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Due Completion</p>
+              <p className="text-[13px] font-bold text-slate-800 leading-none">
+                {ticket.dueDate ? new Date(ticket.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Flexible'}
+              </p>
+            </div>
+          </div>
+          {timeRemaining && (
+            <div className={`px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider ${timeRemaining.className} bg-slate-50 border border-slate-100`}>
+              {timeRemaining.text}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Decorative Footer QR Area */}
+      <div className="h-[100px] relative overflow-hidden flex items-center bg-[#fdfdfd] border-t border-slate-50">
+        {/* Dynamic QR Code Ornament */}
+        <div className="absolute right-[-10px] bottom-[-10px] w-28 h-28 bg-white shadow-[-8px_0_20px_rgba(0,0,0,0.03)] border-t border-l border-slate-100 rounded-tl-[32px] flex items-center justify-center group-hover:scale-105 transition-transform duration-500">
+          {qrSrc ? (
+            <img src={qrSrc} alt="Tracking QR" className="w-[75%] h-[75%] opacity-80" />
+          ) : (
+            <div className="w-16 h-16 bg-slate-50 animate-pulse rounded-lg" />
+          )}
+        </div>
+        
+        <div className="px-6 flex flex-col">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Tracking Info</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+          </div>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[18px] font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tabular-nums">
+              {currency}{ticket.total.toLocaleString()}
+            </span>
+            <div className="w-4 h-4 bg-blue-600 rounded-sm flex items-center justify-center transform rotate-45 group-hover:rotate-0 transition-transform duration-500">
+              <Package size={11} className="text-white transform -rotate-45 group-hover:rotate-0 transition-transform duration-500" />
+            </div>
+          </div>
+          <span className="mt-3 text-[#2d4538] font-bold text-[10px] tracking-wider relative bottom-[-2px]">
+            SCAN FOR TRACKING
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 interface JobTicketFormProps {
   ticket?: JobTicket | null;
@@ -1223,7 +1259,7 @@ const JobTicketDetail: React.FC<JobTicketDetailProps> = ({ ticket, currency, onE
                   {ticket.attachments.map((file) => (
                     <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
                       <div className="flex items-center gap-3">
-                        <File className="h-5 w-5 text-slate-400" />
+                        <FileIcon className="h-5 w-5 text-slate-400" />
                         <div>
                           <p className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{file.name}</p>
                           <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
