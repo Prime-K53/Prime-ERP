@@ -1,5 +1,6 @@
 import { CompanyConfig, NumberingRule } from '../types';
 import { dbService } from './db';
+import { resolveBuiltInDocumentPrefix, resolveEffectiveNumberingRule } from '../utils/numbering';
 
 export type DocumentNumberSeriesKey = 'sales_invoice' | 'examination_batch';
 
@@ -75,13 +76,11 @@ const resolveCompanyRule = (
   companyConfig?: CompanyConfig | null
 ): NumberingRule | null => {
   const effectiveConfig = companyConfig || getCompanyConfig();
-  const numbering = effectiveConfig?.transactionSettings?.numbering as Record<string, NumberingRule> | undefined;
-  if (!numbering) return null;
-
   const definition = SERIES_DEFINITIONS[seriesKey];
-  for (const key of definition.companyKeys) {
-    if (numbering[key]) {
-      return numbering[key];
+  for (const key of [seriesKey, ...definition.companyKeys]) {
+    const rule = resolveEffectiveNumberingRule(key, effectiveConfig);
+    if (rule) {
+      return rule;
     }
   }
 
@@ -135,7 +134,7 @@ const normalizeRule = (
   source?: Partial<NumberingRule> | null,
   currentNumberOverride?: number
 ): NumberingRule => {
-  const defaultPrefix = seriesKey === 'sales_invoice' ? 'INV' : 'EB';
+  const defaultPrefix = resolveBuiltInDocumentPrefix(seriesKey) || (seriesKey === 'sales_invoice' ? 'INV' : 'EB');
   const startNumber = toPositiveInteger(source?.startNumber, 1);
   const currentNumber = toPositiveInteger(currentNumberOverride ?? source?.currentNumber ?? startNumber, startNumber);
 

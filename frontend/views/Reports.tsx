@@ -232,7 +232,7 @@ const Reports: React.FC = () => {
                             </div>
                         </div>
                         <div className="h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minHeight={150} minWidth={0}>
                                 <AreaChart data={trendData}>
                                     <defs>
                                         <linearGradient id="colorGross" x1="0" y1="0" x2="0" y2="1">
@@ -280,7 +280,7 @@ const Reports: React.FC = () => {
                             </div>
                         </div>
                         <div className="h-[300px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" minHeight={150} minWidth={0}>
                                 <BarChart data={adjustmentStats} layout="vertical" margin={{ left: 40, right: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                                     <XAxis type="number" hide />

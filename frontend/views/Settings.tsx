@@ -22,6 +22,12 @@ import { z } from 'zod';
 import { api } from '../services/api';
 import { dbService } from '../services/db';
 import { isPasswordProtectionEnabled, normalizeSecuritySettings, withNormalizedSecurityConfig } from '../utils/securitySettings';
+import {
+    createSharedNumberingConfig,
+    DEFAULT_SHARED_NUMBERING_RULE,
+    formatNumberingPreview,
+    resolveGlobalNumberingRule,
+} from '../utils/numbering';
 import { PrimeTemplatePreview } from './shared/components/PDF/PrimeTemplatePreview';
 import {
     DEFAULT_PRIME_TEMPLATE_SETTINGS,
@@ -262,6 +268,10 @@ const Settings: React.FC = () => {
     const sigRef = useRef<HTMLInputElement>(null);
 
     const currency = config.currencySymbol || '$';
+    const sharedNumberingRule = React.useMemo(
+        () => resolveGlobalNumberingRule(config) || DEFAULT_SHARED_NUMBERING_RULE,
+        [config]
+    );
     const activePricingSettings = {
         ...DEFAULT_PRICING_SETTINGS,
         ...(config.pricingSettings || {})
@@ -439,6 +449,19 @@ const Settings: React.FC = () => {
         }));
     };
 
+    const updateSharedNumbering = (patch: Partial<NumberingRule>) => {
+        setConfig(prev => ({
+            ...prev,
+            transactionSettings: {
+                ...prev.transactionSettings,
+                numbering: createSharedNumberingConfig({
+                    ...resolveGlobalNumberingRule(prev),
+                    ...patch
+                })
+            }
+        }));
+    };
+
     const handleAssetUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'signature') => {
         const file = e.target.files?.[0];
         if (file) {
@@ -499,7 +522,7 @@ const Settings: React.FC = () => {
             title: 'Financials',
             items: [
                 { id: 'Currencies', icon: Wallet, label: 'Currencies', desc: 'Currency symbols and precision' },
-                { id: 'Transactions', icon: RefreshCw, label: 'Transaction Prefixes', desc: 'Numbering sequences for documents' },
+                { id: 'Transactions', icon: RefreshCw, label: 'Transaction Prefixes', desc: 'One shared numbering pattern for documents' },
                 { id: 'GLMapping', icon: Binary, label: 'Chart of Accounts', desc: 'Ledger and mapping configurations' },
                 { id: 'PaymentDetails', icon: Landmark, label: 'Payment Details', desc: 'Bank and mobile money accounts' }
             ]
@@ -1938,90 +1961,104 @@ const Settings: React.FC = () => {
                                                 <h3 className="text-[11px] font-black text-[#6B6C6F] uppercase tracking-[0.2em] flex items-center gap-3">
                                                     <Hash size={18} className="text-[#2CA01C]" /> Transaction Numbering Logic
                                                 </h3>
-                                                <p className="text-xs text-[#6B6C6F] mt-1">Define sequences for all document types.</p>
+                                                <p className="text-xs text-[#6B6C6F] mt-1">Set one numbering pattern. Each document keeps its own built-in prefix automatically.</p>
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-10">
-                                            {[
-                                                { key: 'invoice', label: 'Sales Invoices', icon: FileCheck },
-                                                { key: 'quotation', label: 'Sales Quotations', icon: PenTool },
-                                                { key: 'workorder', label: 'Work Orders', icon: Settings2 },
-                                                { key: 'purchaseorder', label: 'Purchase Bills', icon: ShoppingBag },
-                                                { key: 'deliverynote', label: 'Delivery Notes', icon: Box },
-                                                { key: 'pay', label: 'Customer Payments', icon: Landmark },
-                                                { key: 'spay', label: 'Supplier Payments', icon: Landmark },
-                                                { key: 'grn', label: 'Goods Receipts', icon: PackageCheck },
-                                                { key: 'ledger', label: 'Ledger Entries', icon: FileText },
-                                                { key: 'expense', label: 'Operating Expenses', icon: Wallet },
-                                                { key: 'refund', label: 'Sales Returns/Refunds', icon: Undo2 },
-                                                { key: 'item', label: 'Inventory Items', icon: Box },
-                                                { key: 'customer', label: 'Customer Profiles', icon: Users },
-                                                { key: 'supplier', label: 'Supplier Profiles', icon: Factory },
-                                                { key: 'batch', label: 'Inventory Batches', icon: Layers },
-                                                { key: 'exambatch', label: 'Examination Batches', icon: Beaker },
-                                                { key: 'examsheet', label: 'Examination Sheets', icon: FileText },
-                                                { key: 'audit', label: 'Audit Log System', icon: ShieldCheck }
-                                            ].map(rule => (
-                                                <div key={rule.key} className="p-6 bg-white rounded-lg border border-[#D4D7DC] shadow-sm flex flex-col gap-6 group hover:border-[#2CA01C] transition-all">
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="p-4 bg-[#F4F5F8] rounded-md text-[#6B6C6F] group-hover:bg-green-50 group-hover:text-[#2CA01C] transition-all">
-                                                                <rule.icon size={24} />
-                                                            </div>
-                                                            <div>
-                                                                <p className="font-bold text-[#393A3D] uppercase tracking-tighter text-lg">{rule.label}</p>
-                                                                <p className="text-[10px] text-[#6B6C6F] font-bold uppercase tracking-widest mt-1">Preview: <span className="font-mono text-[#2CA01C]">{(config.transactionSettings?.numbering as any)?.[rule.key]?.prefix}{String((config.transactionSettings?.numbering as any)?.[rule.key]?.startNumber).padStart((config.transactionSettings?.numbering as any)?.[rule.key]?.padding || 4, '0')}</span></p>
-                                                            </div>
-                                                        </div>
+                                            <div className="p-6 bg-white rounded-lg border border-[#D4D7DC] shadow-sm flex flex-col gap-6">
+                                                <div className="flex items-start gap-4">
+                                                    <div className="p-4 bg-[#F4F5F8] rounded-md text-[#2CA01C]">
+                                                        <Hash size={24} />
                                                     </div>
-
-                                                    <div className="grid grid-cols-3 gap-6">
-                                                        <div>
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Prefix</label>
-                                                            <input
-                                                                type="text"
-                                                                placeholder="e.g. INV"
-                                                                className="w-full p-3 bg-[#F4F5F8] border border-[#D4D7DC] rounded-md text-center font-bold text-sm outline-none focus:ring-2 focus:ring-[#2CA01C]/10 focus:border-[#2CA01C] transition-all"
-                                                                value={(config.transactionSettings?.numbering as any)?.[rule.key]?.prefix || ''}
-                                                                onChange={e => setConfig({ ...config, transactionSettings: { ...config.transactionSettings, numbering: { ...config.transactionSettings?.numbering, [rule.key]: { ...(config.transactionSettings?.numbering as any)?.[rule.key], prefix: e.target.value.toUpperCase() } } } as any })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Padding</label>
-                                                            <input
-                                                                type="number"
-                                                                placeholder="e.g. 4"
-                                                                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl text-center font-bold text-sm outline-none focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500 transition-all"
-                                                                value={(config.transactionSettings?.numbering as any)?.[rule.key]?.padding || 4}
-                                                                onChange={e => setConfig({ ...config, transactionSettings: { ...config.transactionSettings, numbering: { ...config.transactionSettings?.numbering, [rule.key]: { ...(config.transactionSettings?.numbering as any)?.[rule.key], padding: parseInt(e.target.value) || 0 } } } as any })}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Start At</label>
-                                                            <input
-                                                                type="number"
-                                                                placeholder="e.g. 1"
-                                                                className="w-full p-3 bg-[#F4F5F8] border border-[#D4D7DC] rounded-md text-center font-bold text-sm outline-none focus:ring-2 focus:ring-[#2CA01C]/10 focus:border-[#2CA01C] transition-all"
-                                                                value={(config.transactionSettings?.numbering as any)?.[rule.key]?.startNumber || 0}
-                                                                onChange={e => setConfig({ ...config, transactionSettings: { ...config.transactionSettings, numbering: { ...config.transactionSettings?.numbering, [rule.key]: { ...(config.transactionSettings?.numbering as any)?.[rule.key], startNumber: parseInt(e.target.value) || 0 } } } as any })}
-                                                            />
-                                                        </div>
-                                                        <div className="col-span-3">
-                                                            <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Reset Sequence</label>
-                                                            <select
-                                                                className="w-full p-3 bg-[#F4F5F8] border border-[#D4D7DC] rounded-md font-bold text-sm outline-none focus:ring-2 focus:ring-[#2CA01C]/10 focus:border-[#2CA01C] transition-all cursor-pointer"
-                                                                value={(config.transactionSettings?.numbering as any)?.[rule.key]?.resetInterval || 'Never'}
-                                                                onChange={e => setConfig({ ...config, transactionSettings: { ...config.transactionSettings, numbering: { ...config.transactionSettings?.numbering, [rule.key]: { ...(config.transactionSettings?.numbering as any)?.[rule.key], resetInterval: e.target.value as any } } } as any })}
-                                                            >
-                                                                <option value="Never">Never Reset (Continuous)</option>
-                                                                <option value="Monthly">Reset Every Month</option>
-                                                                <option value="Yearly">Reset Every Fiscal Year</option>
-                                                            </select>
-                                                        </div>
+                                                    <div>
+                                                        <p className="font-bold text-[#393A3D] uppercase tracking-tighter text-lg">Global Numbering Pattern</p>
+                                                        <p className="text-xs text-[#6B6C6F] mt-1 max-w-xl">
+                                                            Prefixes such as `INV`, `QTN`, `DN`, `POS`, and `RCPT` are fixed by the system.
+                                                            Only the numeric pattern below is shared across all documents.
+                                                        </p>
                                                     </div>
                                                 </div>
-                                            ))}
+
+                                                <div className="grid grid-cols-2 gap-6">
+                                                    <div>
+                                                        <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Padding</label>
+                                                        <input
+                                                            type="number"
+                                                            min={1}
+                                                            placeholder="e.g. 4"
+                                                            className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl text-center font-bold text-sm outline-none focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500 transition-all"
+                                                            value={sharedNumberingRule.padding || 4}
+                                                            onChange={e => updateSharedNumbering({ padding: parseInt(e.target.value, 10) || 1 })}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Start At</label>
+                                                        <input
+                                                            type="number"
+                                                            min={1}
+                                                            placeholder="e.g. 1"
+                                                            className="w-full p-3 bg-[#F4F5F8] border border-[#D4D7DC] rounded-md text-center font-bold text-sm outline-none focus:ring-2 focus:ring-[#2CA01C]/10 focus:border-[#2CA01C] transition-all"
+                                                            value={sharedNumberingRule.startNumber || 1}
+                                                            onChange={e => updateSharedNumbering({ startNumber: parseInt(e.target.value, 10) || 1 })}
+                                                        />
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Prefix Extension / Branch (Optional)</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. P7, HQ, BRANCH01"
+                                                            className="w-full p-3 bg-[#F4F5F8] border border-[#D4D7DC] rounded-md font-bold text-sm outline-none focus:ring-2 focus:ring-[#2CA01C]/10 focus:border-[#2CA01C] transition-all"
+                                                            value={sharedNumberingRule.extension || ''}
+                                                            onChange={e => updateSharedNumbering({ extension: e.target.value })}
+                                                        />
+                                                        <p className="text-[10px] text-slate-400 mt-2 italic px-1">This will be added after the document prefix (e.g. INV-P7/0001).</p>
+                                                    </div>
+                                                    <div className="col-span-2">
+                                                        <label className="text-[9px] font-black text-slate-400 uppercase block mb-3 px-1">Reset Sequence</label>
+                                                        <select
+                                                            className="w-full p-3 bg-[#F4F5F8] border border-[#D4D7DC] rounded-md font-bold text-sm outline-none focus:ring-2 focus:ring-[#2CA01C]/10 focus:border-[#2CA01C] transition-all cursor-pointer"
+                                                            value={sharedNumberingRule.resetInterval || 'Never'}
+                                                            onChange={e => updateSharedNumbering({ resetInterval: e.target.value as NumberingRule['resetInterval'] })}
+                                                        >
+                                                            <option value="Never">Never Reset (Continuous)</option>
+                                                            <option value="Daily">Reset Every Day</option>
+                                                            <option value="Monthly">Reset Every Month</option>
+                                                            <option value="Yearly">Reset Every Fiscal Year</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
+                                                    One change here updates the numbering style used throughout sales, POS, procurement, inventory, and supporting transaction documents.
+                                                </div>
+                                            </div>
+
+                                            <div className="p-6 bg-slate-900 rounded-lg shadow-xl text-white border border-white/5">
+                                                <div className="flex items-center gap-3 mb-6">
+                                                    <FileCheck size={18} className="text-[#2CA01C]" />
+                                                    <div>
+                                                        <p className="text-[10px] font-black text-[#2CA01C] uppercase tracking-widest">Live Preview</p>
+                                                        <p className="text-xs text-slate-300 mt-1">Every document keeps its own prefix, then follows the shared pattern.</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    {[
+                                                        { key: 'invoice', label: 'Sales Invoice' },
+                                                        { key: 'quotation', label: 'Quotation' },
+                                                        { key: 'deliverynote', label: 'Delivery Note' },
+                                                        { key: 'POS', label: 'POS Sale' },
+                                                        { key: 'RCPT', label: 'Customer Receipt' },
+                                                        { key: 'exambatch', label: 'Exam Batch' }
+                                                    ].map(preview => (
+                                                        <div key={preview.key} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                                                            <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">{preview.label}</p>
+                                                            <p className="mt-2 font-mono text-sm text-white">{formatNumberingPreview(preview.key, sharedNumberingRule)}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
                                     </section>
 

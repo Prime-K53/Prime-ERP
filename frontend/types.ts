@@ -10,6 +10,7 @@ export interface AppearanceConfig {
 export interface NumberingRule {
   prefix: string;
   padding: number;
+  extension?: string;
   startNumber: number;
   currentNumber?: number;
   suffix?: string;

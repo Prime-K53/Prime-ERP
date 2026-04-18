@@ -99,7 +99,7 @@ const Sparkline: React.FC<{
 
   return (
     <div style={SPARKLINE_CONTAINER_STYLE}>
-      <ResponsiveContainer width="100%" height={32} minWidth={0} minHeight={0}>
+      <ResponsiveContainer width="100%" height={32} minWidth={0} minHeight={32}>
         <LineChart data={memoizedData}>
           <Line
             type="monotone"

@@ -150,7 +150,7 @@ export const ProfitSummaryCard: React.FC = () => {
           {/* Area Chart */}
           <div className="absolute inset-0 pt-4 pl-12 flex flex-col">
             <div style={{ width: '100%', height: '160px', minHeight: '160px' }}>
-              <ResponsiveContainer width="100%" height="100%" minHeight={0} minWidth={0}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={150} minWidth={0}>
                 <AreaChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">

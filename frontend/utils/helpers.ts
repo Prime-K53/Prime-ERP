@@ -1,7 +1,11 @@
 
 import { Item, CompanyConfig } from '../types';
+import {
+  normalizeNumberingKey,
+  resolveBuiltInDocumentPrefix,
+  resolveEffectiveNumberingRule,
+} from './numbering';
 
-const normalizeNumberingKey = (type: string) => String(type || '').trim().toLowerCase();
 const isInvoiceNumberingType = (type: string) => {
   const normalized = normalizeNumberingKey(type);
   return normalized === 'invoice' || normalized.startsWith('inv') || normalized.includes('invoice');
@@ -10,18 +14,13 @@ const isInvoiceNumberingType = (type: string) => {
 const resolveNumberingRules = (type: string, config?: CompanyConfig) => {
   const cfg = config || getCompanyConfig();
   const rules = cfg?.transactionSettings?.numbering as any;
-  const normalized = normalizeNumberingKey(type);
-  const directRule = rules ? (rules[normalized] || rules[type]) : undefined;
-  const invoiceRule = rules ? (rules.invoice || rules.inv) : undefined;
-  return { rules, directRule, invoiceRule };
+  const effectiveRule = resolveEffectiveNumberingRule(type, cfg);
+  return { rules, effectiveRule };
 };
 
 const resolveNumberingPadding = (type: string, config?: CompanyConfig) => {
-  const { directRule, invoiceRule } = resolveNumberingRules(type, config);
-  let padding = directRule?.padding;
-  if (padding == null && isInvoiceNumberingType(type)) {
-    padding = invoiceRule?.padding;
-  }
+  const { effectiveRule } = resolveNumberingRules(type, config);
+  const padding = effectiveRule?.padding;
   if (padding == null) {
     if (isInvoiceNumberingType(type)) {
       throw new Error('Missing invoice padding configuration.');
@@ -51,16 +50,16 @@ export const assertInvoiceNumberFormat = (id: string, config?: CompanyConfig, ty
 };
 
 export const generateNextId = (type: string, collection: any[], config?: CompanyConfig) => {
-  let prefix = type;
+  let prefix = resolveBuiltInDocumentPrefix(type) || type;
   let startNumber = 1;
   let resetInterval = 'Never';
-  const { directRule } = resolveNumberingRules(type, config);
+  const { effectiveRule } = resolveNumberingRules(type, config);
   const padding = resolveNumberingPadding(type, config);
 
-  if (directRule) {
-    prefix = directRule.prefix || type;
-    startNumber = directRule.startNumber || 1;
-    resetInterval = directRule.resetInterval || 'Never';
+  if (effectiveRule) {
+    prefix = effectiveRule.prefix || prefix;
+    startNumber = effectiveRule.startNumber || 1;
+    resetInterval = effectiveRule.resetInterval || 'Never';
   }
 
   if (!collection || collection.length === 0) {

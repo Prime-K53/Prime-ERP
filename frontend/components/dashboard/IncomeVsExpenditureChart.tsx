@@ -171,7 +171,7 @@ const IncomeVsExpenditureChart: React.FC<IncomeVsExpenditureChartProps> = memo((
 
   return (
     <div style={containerStyle}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={150}>
         <LineChart
           key={stableKey}
           data={memoizedData}

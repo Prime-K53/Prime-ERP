@@ -141,7 +141,7 @@ export const VatDashboard: React.FC = () => {
                     </h3>
                     <div style={{ width: '100%', height: 320, minHeight: 150 }}>
                         {/* console.log("Chart container mounted", chartData) */}
-                        <ResponsiveContainer width="100%" height="100%" minHeight={0} minWidth={0}>
+                        <ResponsiveContainer width="100%" height="100%" minHeight={150} minWidth={0}>
                             <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="name" />

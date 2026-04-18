@@ -6,6 +6,7 @@ import { dbService } from '../services/db';
 import { DEFAULT_PRICING_SETTINGS } from '../services/pricingRoundingService';
 import { syncDocumentNumberSeriesConfig } from '../services/documentNumberService';
 import { isPasswordProtectionEnabled, normalizeSecuritySettings, withNormalizedSecurityConfig } from '../utils/securitySettings';
+import { DEFAULT_SHARED_NUMBERING_RULE, normalizeCompanyNumberingConfig } from '../utils/numbering';
 
 interface Notification {
   id: string;
@@ -210,23 +211,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           allowBackdating: true,
           allowFutureDating: true,
           numbering: {
-            invoice: { prefix: 'INV', startNumber: 1, padding: 4 },
-            quotation: { prefix: 'QTN', startNumber: 1, padding: 4 },
-            workorder: { prefix: 'WO', startNumber: 1, padding: 4 },
-            purchaseorder: { prefix: 'PO', startNumber: 1, padding: 4 },
-            deliverynote: { prefix: 'DN', startNumber: 1, padding: 4 },
-                pay: { prefix: 'PAY', startNumber: 1, padding: 4 },
-                spay: { prefix: 'SPAY', startNumber: 1, padding: 4 },
-                grn: { prefix: 'GRN', startNumber: 1, padding: 4 },
-                ledger: { prefix: 'LED', startNumber: 1, padding: 4 },
-                expense: { prefix: 'EXP', startNumber: 1, padding: 4 },
-                audit: { prefix: 'AUD', startNumber: 1, padding: 4 },
-                refund: { prefix: 'REF', startNumber: 1, padding: 4 },
-                item: { prefix: 'ITM', startNumber: 1, padding: 4 },
-                customer: { prefix: 'CUST', startNumber: 1, padding: 4 },
-                supplier: { prefix: 'SUPP', startNumber: 1, padding: 4 },
-                batch: { prefix: 'BAT', startNumber: 1, padding: 4 }
-        },
+            shared: { ...DEFAULT_SHARED_NUMBERING_RULE }
+          },
           pos: {
               allowReturns: true,
               requireCustomer: false,
@@ -331,14 +317,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (savedConfig) {
           try {
             const rawConfig = JSON.parse(savedConfig);
-            parsedConfig = withNormalizedSecurityConfig({
+            parsedConfig = withNormalizedSecurityConfig(normalizeCompanyNumberingConfig({
               ...defaultCompanyConfig,
               ...rawConfig,
               pricingSettings: {
                 ...DEFAULT_PRICING_SETTINGS,
                 ...(rawConfig?.pricingSettings || {})
               }
-            });
+            }));
             setCompanyConfig(parsedConfig);
           } catch (err) {
             console.error("[Auth] Failed to parse company config:", err);
@@ -616,13 +602,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateCompanyConfig = (config: CompanyConfig) => {
-    const normalizedConfig: CompanyConfig = withNormalizedSecurityConfig({
+    const normalizedConfig: CompanyConfig = withNormalizedSecurityConfig(normalizeCompanyNumberingConfig({
       ...config,
       pricingSettings: {
         ...DEFAULT_PRICING_SETTINGS,
         ...(config.pricingSettings || {})
       }
-    });
+    }));
     setCompanyConfig(normalizedConfig);
     localStorage.setItem('nexus_company_config', JSON.stringify(normalizedConfig));
     void syncDocumentNumberSeriesConfig(normalizedConfig).catch((error) => {
@@ -668,14 +654,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const completeSetup = async (config: CompanyConfig, adminUser: User) => {
-    const normalizedConfig: CompanyConfig = withNormalizedSecurityConfig({
+    const normalizedConfig: CompanyConfig = withNormalizedSecurityConfig(normalizeCompanyNumberingConfig({
       ...defaultCompanyConfig,
       ...config,
       pricingSettings: {
         ...DEFAULT_PRICING_SETTINGS,
         ...(config.pricingSettings || {})
       }
-    });
+    }));
 
     if (userGroups.length === 0) {
       for (const group of INITIAL_USER_GROUPS) {

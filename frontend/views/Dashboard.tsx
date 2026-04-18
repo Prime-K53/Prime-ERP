@@ -1694,7 +1694,7 @@ const DashboardContent: React.FC = () => {
           }}
         >
           {/* Left Column: KPI Cards Grid — 2×2 */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: isMobile ? 12 : 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: isMobile ? 12 : 24, minWidth: 0 }}>
             {/* Card 1 — Company Overview (Sliding) */}
             <SlidingInfoCard
               slides={infoSlides}
@@ -1781,8 +1781,8 @@ const DashboardContent: React.FC = () => {
                 </div>
 
                 {/* BOTTOM SECTION: Sparkline */}
-                <div style={{ width: '100%', marginTop: 4, height: 48 }}>
-                   <ResponsiveContainer width="100%" height={48}>
+                <div style={{ width: '100%', marginTop: 4, height: 48, minWidth: 0 }}>
+                   <ResponsiveContainer width="100%" height={48} minHeight={48} minWidth={0}>
                       <AreaChart data={spark2}>
                         <Area
                           type="monotone"
@@ -2027,6 +2027,7 @@ const DashboardContent: React.FC = () => {
             boxShadow: '0 8px 32px rgba(31,38,135,0.08)',
             display: 'flex',
             flexDirection: 'column',
+            minWidth: 0,
           }}>
             {/* Chart Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: isMobile ? 16 : 24, flexWrap: 'wrap', gap: 8 }}>
@@ -2058,75 +2059,105 @@ const DashboardContent: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ width: '100%', height: isMobile ? 220 : isTablet ? 280 : 316, minWidth: 0, minHeight: 150 }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <AreaChart data={chartData} margin={{ top: 8, right: isMobile ? 4 : 16, left: isMobile ? -24 : -8, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"  stopColor="#16a34a" stopOpacity={0.6} />
-                      <stop offset="60%" stopColor="#22c55e" stopOpacity={0.15} />
-                      <stop offset="100%" stopColor="#bbf7d0" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="gradExpenses" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%"  stopColor="#dc2626" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#fecaca" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(148,163,184,0.18)" />
-                  <XAxis
-                    dataKey="day"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 11, fontWeight: 500 }}
-                    dy={8}
-                    interval={isMobile ? 'preserveStartEnd' : 'preserveStartEnd'}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: '#cbd5e1', fontSize: isMobile ? 10 : 11, fontWeight: 500 }}
-                    tickFormatter={val => val === 0 ? '0' : val >= 1000 ? `${(val/1000).toFixed(0)}k` : String(val)}
-                    dx={-4}
-                    width={isMobile ? 36 : 48}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: 'none',
-                      boxShadow: '0 8px 32px rgba(31,38,135,0.25)',
-                      fontSize: isMobile ? 12 : 14,
-                      padding: isMobile ? '10px 14px' : '14px 20px',
-                      background: '#5b578c',
-                      color: '#ffffff',
-                    }}
-                    labelStyle={{ fontWeight: 600, color: '#e0e7ff', marginBottom: 6, fontSize: 12 }}
-                    itemStyle={{ fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', padding: '2px 0' }}
-                    cursor={{ stroke: 'rgba(79,70,229,0.3)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="income"
-                    name="Revenue"
-                    stroke="#16a34a"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#gradRevenue)"
-                    dot={false}
-                    activeDot={{ r: 6, fill: '#ffffff', stroke: '#16a34a', strokeWidth: 3, filter: 'drop-shadow(0 4px 8px rgba(22,163,74,0.4))' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="expenses"
-                    name="Expense"
-                    stroke="#dc2626"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#gradExpenses)"
-                    dot={false}
-                    activeDot={{ r: 5, fill: '#ffffff', stroke: '#dc2626', strokeWidth: 2 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+            <div
+              style={{
+                width: '100%',
+                height: isMobile ? 220 : isTablet ? 280 : 316,
+                minWidth: 0,
+                minHeight: 150,
+                overflow: 'hidden',
+              }}
+            >
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={150}>
+                  <AreaChart data={chartData} margin={{ top: 8, right: isMobile ? 4 : 16, left: isMobile ? -24 : -8, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="gradRevenue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#16a34a" stopOpacity={0.6} />
+                        <stop offset="60%" stopColor="#22c55e" stopOpacity={0.15} />
+                        <stop offset="100%" stopColor="#bbf7d0" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="gradExpenses" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#dc2626" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#fecaca" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="rgba(148,163,184,0.18)" />
+                    <XAxis
+                      dataKey="day"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 11, fontWeight: 500 }}
+                      dy={8}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: '#cbd5e1', fontSize: isMobile ? 10 : 11, fontWeight: 500 }}
+                      tickFormatter={(val) => val === 0 ? '0' : val >= 1000 ? `${(val / 1000).toFixed(0)}k` : String(val)}
+                      dx={-4}
+                      width={isMobile ? 36 : 48}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 12,
+                        border: 'none',
+                        boxShadow: '0 8px 32px rgba(31,38,135,0.25)',
+                        fontSize: isMobile ? 12 : 14,
+                        padding: isMobile ? '10px 14px' : '14px 20px',
+                        background: '#5b578c',
+                        color: '#ffffff',
+                      }}
+                      labelStyle={{ fontWeight: 600, color: '#e0e7ff', marginBottom: 6, fontSize: 12 }}
+                      itemStyle={{ fontWeight: 800, color: '#ffffff', fontVariantNumeric: 'tabular-nums', padding: '2px 0' }}
+                      cursor={{ stroke: 'rgba(79,70,229,0.3)', strokeWidth: 1.5, strokeDasharray: '4 4' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="income"
+                      name="Revenue"
+                      stroke="#16a34a"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#gradRevenue)"
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#ffffff', stroke: '#16a34a', strokeWidth: 3, filter: 'drop-shadow(0 4px 8px rgba(22,163,74,0.4))' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="expenses"
+                      name="Expense"
+                      stroke="#dc2626"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#gradExpenses)"
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#ffffff', stroke: '#dc2626', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div
+                  style={{
+                    height: '100%',
+                    minHeight: 150,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    color: '#94a3b8',
+                    fontSize: isMobile ? 12 : 13,
+                    fontWeight: 600,
+                    border: '1px dashed rgba(148,163,184,0.28)',
+                    borderRadius: 18,
+                    background: 'rgba(248,250,252,0.7)',
+                    padding: '16px 20px',
+                  }}
+                >
+                  No financial activity is available for the selected period yet.
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -40,6 +40,11 @@ const POS: React.FC = () => {
   const [showHeldOrdersModal, setShowHeldOrdersModal] = useState(false);
   const [showZReport, setShowZReport] = useState(false);
   const [selectedServiceForCalculator, setSelectedServiceForCalculator] = useState<Item | null>(null);
+    
+    const handleConfigureService = (service: Item) => {
+        console.log('handleConfigureService called with:', service.name, service.type, service.category);
+        setSelectedServiceForCalculator(service);
+    };
   const [quickPrintModal, setQuickPrintModal] = useState<{ open: boolean; type: 'photocopy' | 'printing' }>({
     open: false,
     type: 'photocopy'
@@ -772,7 +777,7 @@ const handleQuickPrintConfirm = (quantity: number, pagesPerCopy: number, total: 
         <ProductGrid
           inventory={inventory}
           addToCart={addToCart}
-          onConfigureService={(service) => setSelectedServiceForCalculator(service)}
+          onConfigureService={handleConfigureService}
           onRecall={() => setShowHeldOrdersModal(true)}
           heldCount={heldOrders.length}
           onZReport={() => { setZReportData(generateZReport(user?.id || '')); setShowZReport(true); }}

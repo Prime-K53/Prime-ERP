@@ -226,7 +226,7 @@ const RoundingAnalytics: React.FC = () => {
             </div>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minHeight={150} minWidth={0}>
               <AreaChart data={dailyRows}>
                 <defs>
                   <linearGradient id="colorRealized" x1="0" y1="0" x2="0" y2="1">
@@ -270,7 +270,7 @@ const RoundingAnalytics: React.FC = () => {
               <h3 className="text-lg font-black text-slate-800 tracking-tight mb-2">Method Yield</h3>
               <p className="text-slate-400 text-xs font-medium mb-6">Profit by rounding algorithm</p>
               <div className="h-[180px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minHeight={150} minWidth={0}>
                   <PieChart>
                     <Pie
                       data={methodRows}

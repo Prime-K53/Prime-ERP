@@ -142,7 +142,7 @@ export const AccountDetailsDashboard: React.FC<AccountDetailsDashboardProps> = (
                     </div>
                 </div>
                 <div className="flex-1 w-full h-[350px]">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minHeight={150} minWidth={0}>
                         <AreaChart data={stats.chartData}>
                             <defs>
                                 <linearGradient id="colorBal" x1="0" y1="0" x2="0" y2="1">
