@@ -310,6 +310,17 @@ const applyDocumentResponseHeaders = (res, { contentType, filename, inline = tru
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 };
 
+const parseJsonArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string' || value.trim() === '') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 // Root route for Render health checks
 app.get('/', (req, res) => {
   res.status(200).send('Backend Running');
@@ -439,7 +450,7 @@ async function startServer() {
 
   app.get('/api/sales', (req, res) => {
     db.all(
-      `SELECT id, date, customer_id as customerId, customer_name as customerName, total_amount as totalAmount, status, payment_method as paymentMethod, source
+      `SELECT id, date, customer_id as customerId, customer_name as customerName, total_amount as totalAmount, status, payment_method as paymentMethod, source, items_json, payments_json
        FROM sales
        ORDER BY date DESC`,
       [],
@@ -447,7 +458,19 @@ async function startServer() {
         if (error) {
           return res.status(500).json({ error: error.message });
         }
-        res.json(rows || []);
+        const sales = (rows || []).map((row) => ({
+          id: row.id,
+          date: row.date,
+          customerId: row.customerId,
+          customerName: row.customerName,
+          totalAmount: Number(row.totalAmount || 0),
+          status: row.status,
+          paymentMethod: row.paymentMethod,
+          source: row.source,
+          items: parseJsonArray(row.items_json),
+          payments: parseJsonArray(row.payments_json)
+        }));
+        res.json(sales);
       }
     );
   });
@@ -482,7 +505,9 @@ async function startServer() {
           totalAmount,
           status,
           paymentMethod,
-          source
+          source,
+          items: payload.items || [],
+          payments: payload.payments || []
         });
       }
     );

@@ -390,6 +390,23 @@ const hasMeaningfulDashboardPayload = (payload: any) => {
   return Array.isArray(payload?.chartData) && payload.chartData.some((point: any) => toNum(point?.total) > 0);
 };
 
+const mergeSalePayload = (baseSale: any, remoteSale: any) => {
+  const merged = {
+    ...(baseSale || {}),
+    ...(remoteSale || {})
+  };
+
+  merged.items = Array.isArray(remoteSale?.items)
+    ? remoteSale.items
+    : (Array.isArray(baseSale?.items) ? baseSale.items : []);
+
+  merged.payments = Array.isArray(remoteSale?.payments)
+    ? remoteSale.payments
+    : (Array.isArray(baseSale?.payments) ? baseSale.payments : []);
+
+  return merged;
+};
+
 // Removed API_BASE - All operations must be local-only.
 
 export const api = {
@@ -468,9 +485,13 @@ export const api = {
     getAllSales: () => handle(async () => {
       try {
         const response = await apiClient.get('/sales');
-        const sales = Array.isArray(response.data) ? response.data : [];
+        const remoteSales = Array.isArray(response.data) ? response.data : [];
+        const existingSales = await dbService.getAll<Sale>('sales');
+        const existingSalesById = new Map(existingSales.map((sale: any) => [sale.id, sale]));
+        const sales = remoteSales.map((sale: any) => mergeSalePayload(existingSalesById.get(sale.id), sale));
+
         for (const sale of sales) {
-          await dbService.put('sales', sale);
+          await dbService.put('sales', sale as Sale);
         }
         return sales;
       } catch (err) {
@@ -483,7 +504,7 @@ export const api = {
       await transactionService.processSale(sale);
       try {
         const response = await apiClient.post('/sales', sale);
-        const persistedSale = response.data || sale;
+        const persistedSale = mergeSalePayload(sale, response.data);
         await dbService.put('sales', persistedSale);
         if (typeof window !== 'undefined') {
           console.log('Sale created successfully');
