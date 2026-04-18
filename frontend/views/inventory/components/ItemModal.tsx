@@ -60,6 +60,9 @@ const defaultItem: Partial<Item> = {
     reorderPoint: 0,
     variants: [],
     isVariantParent: false,
+    isStationeryPack: false,
+    costPerPack: 0,
+    unitsPerPack: 0,
 
     locationStock: [],
     pricingConfig: {
@@ -109,57 +112,28 @@ const ItemModal: React.FC<ItemModalProps> = ({
     const [isRecalculating, setIsRecalculating] = useState(false);
 
     // Stationery Pack Conversion State
-    const [stationeryMode, setStationeryMode] = useState<'normal' | 'stationery'>('normal');
-    const [usePackConversion, setUsePackConversion] = useState<boolean>(false);
-    const [costPerPack, setCostPerPack] = useState<number>(0);
-    const [unitsPerPack, setUnitsPerPack] = useState<number>(1);
-    const [sellingPricePerPiece, setSellingPricePerPiece] = useState<number>(0);
+    const [usePackConversion, setUsePackConversion] = useState(false);
+    
+    // Computed values for pack conversion
+    const derivedCostPerPiece = useMemo(() => {
+        if (!formData.unitsPerPack || formData.unitsPerPack === 0) return 0;
+        return (formData.costPerPack || 0) / formData.unitsPerPack;
+    }, [formData.costPerPack, formData.unitsPerPack]);
 
-    // Computed values for stationery conversion
-    const computedValues = useMemo(() => {
-        if (stationeryMode !== 'stationery' || unitsPerPack <= 0) {
-            return {
-                costPerPiece: 0,
-                profitPerPiece: 0,
-                marginPercent: 0,
-                warning: null as string | null
-            };
-        }
+    const calculatedPrice = useMemo(() => {
+        const cost = derivedCostPerPiece;
+        const markup = formData.pricingConfig?.markup || 0;
+        return cost * (1 + markup / 100);
+    }, [derivedCostPerPiece, formData.pricingConfig?.markup]);
 
-        const costPerPiece = costPerPack / unitsPerPack;
-        const profitPerPiece = sellingPricePerPiece - costPerPiece;
-        const marginPercent = sellingPricePerPiece > 0 ? ((profitPerPiece / sellingPricePerPiece) * 100) : 0;
-
-        let warning: string | null = null;
-        if (sellingPricePerPiece < costPerPiece && sellingPricePerPiece > 0) {
-            warning = 'Selling price is below cost price - this will result in a loss';
-        }
-
-        return {
-            costPerPiece,
-            profitPerPiece,
-            marginPercent,
-            warning
-        };
-    }, [stationeryMode, costPerPack, unitsPerPack, sellingPricePerPiece]);
-
-    // Auto-sync stationery values to formData cost/price when pack conversion is enabled
-    useEffect(() => {
-        if (stationeryMode !== 'stationery' || !usePackConversion) return;
-
-        // Set cost from pack, price from piece selling price, but let market adjustments calculate final
-        setFormData(prev => ({
-            ...prev,
-            cost: computedValues.costPerPiece,
-            pricingConfig: {
-                ...prev.pricingConfig,
-                manualOverride: false // Allow market adjustments to calculate final price
-            }
-        }));
-    }, [stationeryMode, usePackConversion, computedValues.costPerPiece]);
-
-    // Check if item has stock (for validation)
-    const hasExistingStock = formData.stock && formData.stock > 0;
+    const finalPrice = useMemo(() => {
+        const roundingResult = applyProductPriceRounding({
+            calculatedPrice,
+            methodOverride: formData.pricingConfig?.selectedRoundingMethod,
+            customStepOverride: formData.pricingConfig?.customRoundingStep
+        });
+        return roundingResult.roundedPrice;
+    }, [calculatedPrice, formData.pricingConfig?.selectedRoundingMethod, formData.pricingConfig?.customRoundingStep]);
 
     const isServiceType = formData.type === 'Service';
 
@@ -240,37 +214,11 @@ const ItemModal: React.FC<ItemModalProps> = ({
                     manualOverride: shouldBeManual
                 }
             });
-
-            // Load stationery conversion fields if this is a stationery pack item
-            if (item.type === 'Stationery' && item.isStationeryPack) {
-                setStationeryMode('stationery');
-                setUsePackConversion(true);
-                setCostPerPack(item.costPerPack || item.cost * (item.unitsPerPack || 1) || 0);
-                setUnitsPerPack(item.unitsPerPack || 1);
-                setSellingPricePerPiece(item.sellingPricePerPiece || item.price || 0);
-            } else if (item.type === 'Stationery') {
-                setStationeryMode('stationery');
-                setUsePackConversion(false);
-                setCostPerPack(0);
-                setUnitsPerPack(1);
-                setSellingPricePerPiece(0);
-            } else {
-                setStationeryMode('normal');
-                setUsePackConversion(false);
-                setCostPerPack(0);
-                setUnitsPerPack(1);
-                setSellingPricePerPiece(0);
-            }
         } else {
             setFormData({
                 ...defaultItem,
                 sku: generateSKU()
             });
-            setStationeryMode('normal');
-            setUsePackConversion(false);
-            setCostPerPack(0);
-            setUnitsPerPack(1);
-            setSellingPricePerPiece(0);
         }
         setErrors({});
         setActiveTab('basic');
@@ -605,9 +553,9 @@ const ItemModal: React.FC<ItemModalProps> = ({
                 name: formData.name!.trim(),
                 sku: formData.sku!.trim(),
                 description: formData.description?.trim() || '',
-                price: stationeryMode === 'stationery' ? (formData.price || sellingPricePerPiece) : roundedPricing.sellingPrice,
-                cost: stationeryMode === 'stationery' ? computedValues.costPerPiece : Number(formData.cost) || 0,
-                cost_price: stationeryMode === 'stationery' ? computedValues.costPerPiece : Number(formData.cost) || 0,
+                price: roundedPricing.sellingPrice,
+                cost: Number(formData.cost) || 0,
+                cost_price: Number(formData.cost) || 0,
                 calculated_price: roundedPricing.calculatedPrice,
                 selling_price: roundedPricing.sellingPrice,
                 rounding_difference: roundedPricing.roundingDifference,
@@ -615,7 +563,7 @@ const ItemModal: React.FC<ItemModalProps> = ({
                 stock: Number(formData.stock) || 0,
                 category: formData.category!.trim(),
                 type: formData.type as Item['type'],
-                unit: stationeryMode === 'stationery' ? 'pcs' : formData.unit!.trim(),
+                unit: formData.unit!.trim(),
                 minStockLevel: Number(formData.minStockLevel) || 0,
                 preferredSupplierId: formData.preferredSupplierId || undefined,
                 binLocation: formData.binLocation?.trim() || undefined,
@@ -636,14 +584,7 @@ const ItemModal: React.FC<ItemModalProps> = ({
                 reserved: formData.reserved || 0,
                 adjustmentSnapshots: formData.adjustmentSnapshots || [],
                 pricingConfig: normalizedPricingConfig,
-                smartPricing: formData.smartPricing,
-                // Stationery Pack-to-Piece Conversion
-                isStationeryPack: stationeryMode === 'stationery',
-                costPerPack: stationeryMode === 'stationery' ? costPerPack : undefined,
-                unitsPerPack: stationeryMode === 'stationery' ? unitsPerPack : undefined,
-                sellingPricePerPiece: stationeryMode === 'stationery' ? sellingPricePerPiece : undefined,
-                costPerPiece: stationeryMode === 'stationery' ? computedValues.costPerPiece : undefined,
-                profitPerPiece: stationeryMode === 'stationery' ? computedValues.profitPerPiece : undefined
+                smartPricing: formData.smartPricing
             };
 
             // Ensure variants also have rounded prices
@@ -1100,11 +1041,7 @@ const ItemModal: React.FC<ItemModalProps> = ({
                                             <span className="text-sm font-medium text-slate-700">Item Type</span>
                                             <select
                                                 value={formData.type || 'Product'}
-                                                onChange={(e) => {
-                                                    const newType = e.target.value as Item['type'];
-                                                    setFormData({ ...formData, type: newType });
-                                                    setStationeryMode(newType === 'Stationery' ? 'stationery' : 'normal');
-                                                }}
+                                                onChange={(e) => setFormData({ ...formData, type: e.target.value as Item['type'] })}
                                                 className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.type ? 'border-red-300 bg-red-50' : 'border-slate-200'
                                                     }`}
                                             >
@@ -1206,7 +1143,355 @@ const ItemModal: React.FC<ItemModalProps> = ({
                                                 />
                                             </div>
                                         </div>
-)}
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Pricing Tab */}
+                            {!isServiceType && activeTab === 'pricing' && (
+                                <div className="space-y-6 max-h-[65vh] overflow-y-auto pr-4 custom-scrollbar">
+                                    
+                                    {/* Stationery Pack Conversion Toggle */}
+                                    {formData.type === 'Stationery' && (
+                                        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-indigo-100 rounded-lg">
+                                                        <Package className="w-5 h-5 text-indigo-600" />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-sm font-bold text-indigo-900">Use Pack-to-Piece Conversion</h3>
+                                                        <p className="text-xs text-indigo-700">Calculate price per piece from pack pricing</p>
+                                                    </div>
+                                                </div>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="sr-only peer"
+                                                        checked={usePackConversion}
+                                                        onChange={(e) => {
+                                                            setUsePackConversion(e.target.checked);
+                                                            if (e.target.checked) {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    isStationeryPack: true,
+                                                                    cost: derivedCostPerPiece,
+                                                                    price: finalPrice
+                                                                }));
+                                                            } else {
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    isStationeryPack: false,
+                                                                    costPerPack: 0,
+                                                                    unitsPerPack: 0
+                                                                }));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                </label>
+                                            </div>
+                                            
+                                            {/* Pack Conversion Fields */}
+                                            {usePackConversion && (
+                                                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-indigo-800 mb-1">Cost per Pack</label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400">{currency}</span>
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={formData.costPerPack || ''}
+                                                                onChange={(e) => setFormData({ 
+                                                                    ...formData, 
+                                                                    costPerPack: Number(e.target.value),
+                                                                    cost: derivedCostPerPiece
+                                                                })}
+                                                                className="w-full pl-8 pr-4 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                                                placeholder="e.g. 500.00"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-indigo-800 mb-1">Units per Pack</label>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            value={formData.unitsPerPack || ''}
+                                                            onChange={(e) => setFormData({ 
+                                                                ...formData, 
+                                                                unitsPerPack: Number(e.target.value),
+                                                                cost: derivedCostPerPiece
+                                                            })}
+                                                            className="w-full px-4 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                                            placeholder="e.g. 50"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* Markup Field */}
+                                                <div className="mt-4">
+                                                    <label className="block text-xs font-medium text-indigo-800 mb-1">Markup (%)</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.1"
+                                                            value={formData.pricingConfig?.markup || ''}
+                                                            onChange={(e) => setFormData({
+                                                                ...formData,
+                                                                pricingConfig: {
+                                                                    ...formData.pricingConfig!,
+                                                                    markup: Number(e.target.value)
+                                                                }
+                                                            })}
+                                                            className="w-full px-4 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                                                            placeholder="e.g. 30"
+                                                        />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-400">%</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            {/* Calculated Values Display */}
+                                            {usePackConversion && (
+                                                <div className="mt-4 p-3 bg-white rounded-lg border border-indigo-100 space-y-2">
+                                                    <div className="flex justify-between text-xs">
+                                                        <span className="text-slate-600">Derived Cost per Piece:</span>
+                                                        <span className="font-medium text-slate-800">{currency} {derivedCostPerPiece.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs">
+                                                        <span className="text-slate-600">Calculated Price:</span>
+                                                        <span className="font-medium text-indigo-600">{currency} {calculatedPrice.toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-xs">
+                                                        <span className="text-slate-600">Final Price (after rounding):</span>
+                                                        <span className="font-bold text-green-600">{currency} {finalPrice.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Cost Price */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                Cost Price <span className="text-red-500">*</span>
+                                            </label>
+                                            <div className="relative">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{currency}</span>
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={usePackConversion ? derivedCostPerPiece : (formData.cost || '')}
+                                                    onChange={(e) => !usePackConversion && setFormData({ ...formData, cost: Number(e.target.value) })}
+                                                    disabled={usePackConversion}
+                                                    readOnly={usePackConversion}
+                                                    className={`w-full pl-8 pr-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.cost ? 'border-red-300 bg-red-50' : 'border-slate-200'} ${usePackConversion ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                                                    placeholder="e.g. 10.00"
+                                                />
+                                            </div>
+                                            {usePackConversion && (
+                                                <p className="mt-1 text-xs text-indigo-500">Auto-calculated from pack cost</p>
+                                            )}
+                                        </div>
+
+                                        {/* Selling Price - Hidden for Materials */}
+                                        {formData.type !== 'Material' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Selling Price {usePackConversion ? '(Auto-calculated)' : ''} <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">{currency}</span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={usePackConversion ? finalPrice : (formData.price || '')}
+                                                        onChange={(e) => !usePackConversion && setFormData({ 
+                                                            ...formData, 
+                                                            price: Number(e.target.value), 
+                                                            calculated_price: Number(e.target.value),
+                                                            pricingConfig: {
+                                                                ...formData.pricingConfig!,
+                                                                manualOverride: true
+                                                            }
+                                                        })}
+                                                        disabled={usePackConversion}
+                                                        readOnly={usePackConversion}
+                                                        className={`w-full pl-8 pr-12 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.price ? 'border-red-300 bg-red-50' : 'border-slate-200'} ${usePackConversion ? 'bg-indigo-50 text-indigo-700' : ''}`}
+                                                        placeholder="e.g. 25.00"
+                                                    />
+                                                    {(usePackConversion || (!formData.pricingConfig?.manualOverride && formData.type === 'Stationery')) && (
+                                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                                            <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                                                                <RefreshCw className="w-2.5 h-2.5 animate-spin-slow" /> AUTO
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {errors.price && (
+                                                    <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
+                                                        <AlertCircle className="w-3 h-3" /> {errors.price}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                    {/* Margin Display - Hidden for Materials */}
+                                    {formData.type !== 'Material' && (
+                                        <div className="md:col-span-2 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-slate-600">Profit Margin</span>
+                                                <span className={`text-lg font-bold ${formData.cost && formData.price && formData.price > formData.cost
+                                                    ? 'text-green-600'
+                                                    : 'text-red-600'
+                                                    }`}>
+                                                    {formData.cost && formData.price
+                                                        ? `${(((formData.price - formData.cost) / formData.cost) * 100).toFixed(1)}%`
+                                                        : '0%'
+                                                    }
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Internal Pricing Toggle Section - Hidden for Materials */}
+                                    {formData.type !== 'Material' && formData.type !== 'Stationery' && (
+                                        <div className="md:col-span-2 border-t border-slate-200 pt-4">
+                                            <div className="flex items-center justify-between">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowInternalPricing(!showInternalPricing)}
+                                                    className="flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-blue-600 transition-colors"
+                                                >
+                                                    {showInternalPricing ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                                    {showInternalPricing ? 'Hide Internal Pricing' : 'Show Internal Pricing'}
+                                                </button>
+                                                
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsRecalculating(true);
+                                                        const roundingResult = applyRoundingToPrice(resolveRoundingBasePrice(), item || undefined);
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            price: roundingResult.sellingPrice
+                                                        }));
+                                                        setTimeout(() => setIsRecalculating(false), 500);
+                                                    }}
+                                                    disabled={isRecalculating}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                                                >
+                                                    <RefreshCw className={`w-4 h-4 ${isRecalculating ? 'animate-spin' : ''}`} />
+                                                    Recalculate Price
+                                                </button>
+                                            </div>
+
+                                            {/* Internal Pricing Details */}
+                                            {showInternalPricing && (
+                                                <div className="mt-4 p-4 bg-slate-800 rounded-lg text-white space-y-3">
+                                                    {(() => {
+                                                        const roundingResult = applyRoundingToPrice(resolveRoundingBasePrice(), item || undefined);
+                                                        return (
+                                                            <>
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-sm text-slate-400">Calculated Price (Raw)</span>
+                                                                    <span className="font-mono">{currency}{roundingResult.calculatedPrice.toFixed(2)}</span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-sm text-slate-400">Rounding Difference</span>
+                                                                    <span className={`font-mono ${roundingResult.roundingDifference > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
+                                                                        {roundingResult.roundingDifference > 0 ? '+' : ''}{currency}{roundingResult.roundingDifference.toFixed(2)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-sm text-slate-400">Rounding Method</span>
+                                                                    <span className="font-mono text-blue-300">{roundingResult.roundingMethod || 'None'}</span>
+                                                                </div>
+                                                                <div className="border-t border-slate-600 pt-3 flex justify-between items-center">
+                                                                    <span className="text-sm font-medium">Selling Price (Rounded)</span>
+                                                                    <span className="text-xl font-bold text-green-400">{currency}{roundingResult.sellingPrice.toFixed(2)}</span>
+                                                                </div>
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                        {/* Pages - Hidden for Materials & Stationery */}
+                                        {formData.type !== 'Material' && formData.type !== 'Stationery' && (
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 mb-1">
+                                                    Pages
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={formData.pages || 1}
+                                                    onChange={(e) => setFormData({ ...formData, pages: Number(e.target.value) })}
+                                                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Conversion Unit Section for Materials & Stationery */}
+                                    {(formData.type === 'Material' || formData.type === 'Stationery') && (
+                                        <div className="border-t border-slate-200 pt-6">
+                                            <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                                                <Scale className="w-5 h-5 text-indigo-600" /> UOM Conversion
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Purchase Unit (e.g., Box/Ream)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={formData.purchaseUnit || ''}
+                                                        onChange={(e) => setFormData({ ...formData, purchaseUnit: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                        placeholder="e.g. Box"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Stock/Usage Unit (e.g., Pcs/Sheet)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={formData.usageUnit || ''}
+                                                        onChange={(e) => setFormData({ ...formData, usageUnit: e.target.value })}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                        placeholder="e.g. Pcs"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Conversion Rate (Stock per Purchase Unit)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={formData.conversionRate || 1}
+                                                        onChange={(e) => setFormData({ ...formData, conversionRate: Number(e.target.value) })}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                        placeholder="e.g. 50"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 flex items-start gap-2 bg-amber-50 p-3 rounded-lg border border-amber-200">
+                                                <Info className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                                <p className="text-xs text-amber-800">
+                                                    <strong>How it works:</strong> Purchase in <em>{formData.purchaseUnit || 'Purchase Unit'}</em>, stock in <em>{formData.usageUnit || 'Stock Unit'}</em>.<br />
+                                                    <strong>Example:</strong> Buying 1 box of 50 pens → Stock increases by 50 units. Cost is per {formData.purchaseUnit || 'purchase unit'}.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+
 
                                     {/* Market Adjustments Toggle/Select for Stationery */}
                                     {formData.type === 'Stationery' && (
@@ -1792,17 +2077,82 @@ const ItemModal: React.FC<ItemModalProps> = ({
                                                         type="number"
                                                         step="0.01"
                                                         value={newVariant.cost || 0}
-                                                        onChange={(e) => setNewVariant({ ...newVariant, cost: Number(e.target.value) })}
+                                                        onChange={(e) => {
+                                                            const newCost = Number(e.target.value);
+                                                            setNewVariant({ ...newVariant, cost: newCost });
+                                                            // Auto-calculate price for Stationery variants
+                                                            if (formData.type === 'Stationery' && newVariant.adjustmentPercent !== undefined) {
+                                                                const adjPrice = newCost * (1 + (newVariant.adjustmentPercent || 0) / 100);
+                                                                const roundingResult = applyProductPriceRounding({
+                                                                    calculatedPrice: adjPrice,
+                                                                    methodOverride: newVariant.selectedRoundingMethod
+                                                                });
+                                                                setNewVariant(prev => ({ ...prev, price: roundingResult.roundedPrice, calculated_price: roundingResult.calculatedPrice }));
+                                                            }
+                                                        }}
                                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Price ({currency})</label>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Adj (%)</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.1"
+                                                        value={newVariant.adjustmentPercent || 0}
+                                                        onChange={(e) => {
+                                                            const adjPercent = Number(e.target.value);
+                                                            setNewVariant({ ...newVariant, adjustmentPercent: adjPercent });
+                                                            // Auto-calculate price for Stationery variants
+                                                            if (formData.type === 'Stationery') {
+                                                                const baseCost = newVariant.cost || formData.cost || 0;
+                                                                const adjPrice = baseCost * (1 + adjPercent / 100);
+                                                                const roundingResult = applyProductPriceRounding({
+                                                                    calculatedPrice: adjPrice,
+                                                                    methodOverride: newVariant.selectedRoundingMethod
+                                                                });
+                                                                setNewVariant(prev => ({ ...prev, price: roundingResult.roundedPrice, calculated_price: roundingResult.calculatedPrice }));
+                                                            }
+                                                        }}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">Rounding</label>
+                                                    <select
+                                                        value={newVariant.selectedRoundingMethod || 'none'}
+                                                        onChange={(e) => {
+                                                            setNewVariant({ ...newVariant, selectedRoundingMethod: e.target.value });
+                                                            // Auto-calculate price when rounding changes
+                                                            if (formData.type === 'Stationery') {
+                                                                const baseCost = newVariant.cost || formData.cost || 0;
+                                                                const adjPercent = newVariant.adjustmentPercent || 0;
+                                                                const adjPrice = baseCost * (1 + adjPercent / 100);
+                                                                const roundingResult = applyProductPriceRounding({
+                                                                    calculatedPrice: adjPrice,
+                                                                    methodOverride: e.target.value
+                                                                });
+                                                                setNewVariant(prev => ({ ...prev, price: roundingResult.roundedPrice, calculated_price: roundingResult.calculatedPrice }));
+                                                            }
+                                                        }}
+                                                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                                                    >
+                                                        <option value="none">None</option>
+                                                        <option value="ROUND_UP">Round Up</option>
+                                                        <option value="ROUND_DOWN">Round Down</option>
+                                                        <option value="NEAREST_1">Nearest 1</option>
+                                                        <option value="NEAREST_5">Nearest 5</option>
+                                                        <option value="NEAREST_10">Nearest 10</option>
+                                                        <option value="NEAREST_50">Nearest 50</option>
+                                                        <option value="NEAREST_100">Nearest 100</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-slate-600 mb-1">SP ({currency})</label>
                                                     <input
                                                         type="number"
                                                         step="0.01"
                                                         value={newVariant.price || 0}
-                                                        onChange={(e) => setNewVariant({ ...newVariant, price: Number(e.target.value) })}
+                                                        onChange={(e) => setNewVariant({ ...newVariant, price: Number(e.target.value), calculated_price: Number(e.target.value) })}
                                                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                                                     />
                                                 </div>
@@ -1968,8 +2318,9 @@ const ItemModal: React.FC<ItemModalProps> = ({
                         </form>
                     </div>
                 </div>
-            </div>
-        </div>
+
+            </div >
+        </div >
     );
 };
 

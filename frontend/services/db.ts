@@ -110,13 +110,17 @@ interface NexusDB extends DBSchema {
     idempotencyKeys: { key: string; value: { id: string; scope: string; sourceId: string; createdAt: string; metadata?: any } };
     settings: { key: string; value: any; };
     customerNotificationLogs: { key: string; value: any; };
+    whatsappChats: { key: string; value: any; };
+    whatsappTemplates: { key: string; value: any; };
+    whatsappCampaigns: { key: string; value: any; };
+    whatsappAutomations: { key: string; value: any; };
 }
 
 const DB_NAME = 'PrimeERP_Final_v3_Clean';
 // Version bump required so existing IndexedDB instances run upgrade()
 // and create newly-added stores such as examinationBatchNotifications
 // and notificationAuditLogs.
-const DB_VERSION = 31;
+const DB_VERSION = 32;
 
 let dbPromise: Promise<IDBPDatabase<NexusDB>> | null = null;
 
@@ -206,7 +210,8 @@ const STORE_NAMES: (keyof NexusDB)[] = [
     'bankExchangeRates', 'bankFees', 'bankReconciliations', 'bankAdjustments',
     'bankCashFlowForecasts', 'bankAlerts', 'bankCategories',
     'idempotencyKeys',
-    'settings', 'customerNotificationLogs'
+    'settings', 'customerNotificationLogs',
+    'whatsappChats', 'whatsappTemplates', 'whatsappCampaigns', 'whatsappAutomations'
 ];
 
 export const initDB = async (): Promise<IDBPDatabase<NexusDB>> => {

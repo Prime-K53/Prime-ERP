@@ -11,10 +11,8 @@ import { SalesProvider } from './context/SalesContext';
 import { ProductionProvider } from './context/ProductionContext';
 import { ProcurementProvider } from './context/ProcurementContext';
 import { DataProvider, useData } from './context/DataContext';
-import { PricingCalculatorProvider } from './context/PricingCalculatorContext';
 import { ExaminationProvider } from './context/ExaminationContext';
 import { NotificationProvider } from './context/NotificationContext';
-import PricingCalculator from './components/PricingCalculator';
 import { OrdersProvider } from './context/OrdersContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useDocumentStore } from './stores/documentStore.ts';
@@ -118,8 +116,11 @@ const GlobalSearch = lazyWithRetry('./views/GlobalSearch', () => import('./views
 const ChequeManager = lazyWithRetry('./views/tools/ChequeManager', () => import('./views/tools/ChequeManager'));
 const VatView = lazyWithRetry('./views/vat/VatView', () => import('./views/vat/VatView'));
 const BarcodePrinter = lazyWithRetry('./views/tools/BarcodePrinter', () => import('./views/tools/BarcodePrinter'));
-const SmartPricing = lazyWithRetry('./views/tools/SmartPricing', () => import('./views/tools/SmartPricing'));
 const MarketAdjustments = lazyWithRetry('./views/tools/MarketAdjustments', () => import('./views/tools/MarketAdjustments'));
+const SmartPricing = lazyWithRetry('./views/tools/SmartPricing', () => import('./views/tools/SmartPricing'));
+const SmartOperationsHub = lazyWithRetry('./views/SmartOperationsHub', () => import('./views/SmartOperationsHub'));
+const MarketingMessages = lazyWithRetry('./views/tools/MarketingMessages', () => import('./views/tools/MarketingMessages'));
+const AIAssistant = lazyWithRetry('./views/tools/AIAssistant', () => import('./views/tools/AIAssistant'));
 
 const BusinessHealthReport = lazyWithRetry('./views/reports/BusinessHealthReport', () => import('./views/reports/BusinessHealthReport'));
 // VATReport removed
@@ -516,9 +517,11 @@ const AppLayout: React.FC = () => {
                 <Route path="/internal-tools/cheques" element={<ChequeManager />} />
                 <Route path="/internal-tools/barcodes" element={<BarcodePrinter />} />
                 <Route path="/internal-tools/import" element={<DataImport />} />
-                <Route path="/internal-tools/chat" element={<ChatApp />} />
-                <Route path="/internal-tools/pricing" element={<SmartPricing />} />
-                <Route path="/internal-tools/adjustments" element={<MarketAdjustments />} />
+                <Route path="/smart-operations" element={<SmartOperationsHub />} />
+                <Route path="/smart-operations/ai" element={<AIAssistant />} />
+                <Route path="/smart-operations/adjustments" element={<MarketAdjustments />} />
+                <Route path="/smart-operations/pricing" element={<SmartPricing />} />
+                <Route path="/smart-operations/messages" element={<MarketingMessages />} />
 
                 <Route path="/reports" element={<ProtectedRoute permission="reports.view"><Reports /></ProtectedRoute>} />
                 <Route path="/audit" element={<AuditLogs />} />
@@ -683,11 +686,8 @@ const App: React.FC = () => {
                       <SalesProvider>
                         <OrdersProvider>
                           <DataProvider>
-                            <PricingCalculatorProvider>
                               <RootNavigator />
-                              <PricingCalculator />
-                            </PricingCalculatorProvider>
-                          </DataProvider>
+                            </DataProvider>
                         </OrdersProvider>
                       </SalesProvider>
                     </ProcurementProvider>

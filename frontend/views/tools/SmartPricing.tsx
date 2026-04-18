@@ -1,282 +1,611 @@
-import React, { useState, useEffect } from 'react';
-import { Calculator, TrendingUp, DollarSign, Percent, RefreshCw, Save, Plus, Trash2 } from 'lucide-react';
-import { dbService } from '../../services/db';
-import { MarketAdjustment, SmartPricingConfig, BOMTemplate } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Calculator, ChevronDown, ChevronUp, X, Info, Copy, RefreshCw, Save, Printer, Package, Settings, Plus } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useSales } from '../../context/SalesContext';
+import { useNavigate } from 'react-router-dom';
+import { dbService } from '../../services/db';
+import { Item, MarketAdjustment, BOMTemplate } from '../../types';
+
+interface FinishingOption {
+    id: string;
+    name: string;
+    cost: number;
+    enabled: boolean;
+    description?: string;
+    coversPerCopy?: number;
+    materialConversionRate?: number;
+}
+
+const defaultFinishingOptions: FinishingOption[] = [
+    { id: 'binding', name: 'Binding', cost: 150, enabled: false, description: 'Book binding - comb or spiral', coversPerCopy: 1, materialConversionRate: 1 },
+    { id: 'coverPages', name: 'Cover Pages', cost: 20, enabled: false, description: 'Front and back cover pages per copy', coversPerCopy: 2, materialConversionRate: 1 },
+    { id: 'cutting', name: 'Cutting & Trimming', cost: 30, enabled: false, description: 'Trim edges to clean finish', coversPerCopy: 1, materialConversionRate: 1 },
+    { id: 'holePunch', name: 'Hole Punching', cost: 20, enabled: false, description: 'Punch holes for folder binding', coversPerCopy: 1, materialConversionRate: 1 },
+    { id: 'folding', name: 'Folding', cost: 15, enabled: false, description: 'Fold pages for insertion', coversPerCopy: 1, materialConversionRate: 1 },
+    { id: 'stapling', name: 'Stapling', cost: 10, enabled: false, description: 'Corner or saddle stapling', coversPerCopy: 1, materialConversionRate: 1 },
+];
 
 const SmartPricing: React.FC = () => {
-    const { notify } = useData();
-    const [adjustments, setAdjustments] = useState<MarketAdjustment[]>([]);
-    const [bomTemplates, setBomTemplates] = useState<BOMTemplate[]>([]);
-    const [config, setConfig] = useState<SmartPricingConfig>({
-        pricingModel: 'cost-plus',
-        baseMargin: 25,
-        isOnlineMode: false,
-        vatEnabled: true,
-        vatPercentage: 16.5,
-        vatPricingMode: 'exclusive',
-        pricingPriority: 'market-adjustments'
-    });
-    const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
-    const [baseCost, setBaseCost] = useState<number>(0);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const { companyConfig } = useData();
+    const { addJobOrder, jobOrders } = useSales();
+    const navigate = useNavigate();
+    const currency = companyConfig?.currencySymbol || 'K';
+    
+    const [pages, setPages] = useState(1);
+    const [copies, setCopies] = useState(1);
+    const [selectedPaperId, setSelectedPaperId] = useState<string>('');
+    const [selectedTonerId, setSelectedTonerId] = useState<string>('');
+    const [finishingOptions, setFinishingOptions] = useState<FinishingOption[]>(defaultFinishingOptions);
+    const [marketAdjustmentEnabled, setMarketAdjustmentEnabled] = useState(true);
+    const [showSettings, setShowSettings] = useState(false);
+    const [editingCosts, setEditingCosts] = useState<{ [key: string]: number }>({});
+    const [inventory, setInventory] = useState<Item[]>([]);
+    const [marketAdjustments, setMarketAdjustments] = useState<MarketAdjustment[]>([]);
+    const [bomTemplates, setBOMTemplates] = useState<BOMTemplate[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    
+    const [paperExpanded, setPaperExpanded] = useState(true);
+    const [finishingExpanded, setFinishingExpanded] = useState(true);
+    const [marketExpanded, setMarketExpanded] = useState(true);
+    const [bomExpanded, setBomExpanded] = useState(true);
 
     useEffect(() => {
+        const loadData = async () => {
+            try {
+                setIsLoading(true);
+                const [inv, adjustments, templates] = await Promise.all([
+                    dbService.getAll<Item>('inventory'),
+                    dbService.getAll<MarketAdjustment>('marketAdjustments'),
+                    dbService.getAll<BOMTemplate>('bomTemplates'),
+                ]);
+                setInventory(inv);
+                setMarketAdjustments(adjustments);
+                setBOMTemplates(templates);
+
+                const savedCosts = await dbService.getSetting<Record<string, number>>('finishingOptionCosts');
+                if (savedCosts) {
+                    setFinishingOptions(prev => prev.map(opt => ({
+                        ...opt,
+                        cost: savedCosts[opt.id] ?? opt.cost
+                    })));
+                }
+
+                const paperItems = inv.filter(i => {
+                    const cat = (i.category || '').toLowerCase();
+                    return cat.includes('paper') || cat.includes('bond') || cat.includes('sheet');
+                });
+                const tonerItems = inv.filter(i => {
+                    const cat = (i.category || '').toLowerCase();
+                    return cat.includes('toner') || cat.includes('ink') || cat.includes('cartridge');
+                });
+
+                if (paperItems.length > 0) setSelectedPaperId(paperItems[0].id);
+                if (tonerItems.length > 0) setSelectedTonerId(tonerItems[0].id);
+            } catch (err) {
+                console.error('Failed to load pricing data:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
         loadData();
     }, []);
 
-    const loadData = async () => {
-        try {
-            const [adjustmentsData, templatesData, configData] = await Promise.all([
-                dbService.getAll<MarketAdjustment>('marketAdjustments'),
-                dbService.getAll<BOMTemplate>('bomTemplates'),
-                dbService.getSetting<SmartPricingConfig>('smartPricingConfig')
-            ]);
+    const paperItems = useMemo(() => inventory.filter(i => {
+        const cat = (i.category || '').toLowerCase();
+        return cat.includes('paper') || cat.includes('bond') || cat.includes('sheet');
+    }), [inventory]);
 
-            setAdjustments(adjustmentsData.filter(a => a.active || a.isActive));
-            setBomTemplates(templatesData);
-            if (configData) {
-                setConfig(configData);
-            }
-        } catch (error) {
-            console.error('Error loading smart pricing data:', error);
-        } finally {
-            setLoading(false);
+    const tonerItems = useMemo(() => inventory.filter(i => {
+        const cat = (i.category || '').toLowerCase();
+        return cat.includes('toner') || cat.includes('ink') || cat.includes('cartridge');
+    }), [inventory]);
+
+    const selectedPaper = useMemo(() => inventory.find(i => i.id === selectedPaperId), [inventory, selectedPaperId]);
+    const selectedToner = useMemo(() => inventory.find(i => i.id === selectedTonerId), [inventory, selectedTonerId]);
+
+    const calculateCosts = () => {
+        let paperCost = 0;
+        if (selectedPaper) {
+            const sheetsPerCopy = Math.ceil(pages / 2);
+            const totalSheets = sheetsPerCopy * copies;
+            const reamSize = Number(selectedPaper.conversionRate || selectedPaper.conversion_rate || 500);
+            const paperUnitCost = Number(selectedPaper.cost_price || selectedPaper.cost_per_unit || selectedPaper.cost || 0);
+            const costPerSheet = reamSize > 0 ? paperUnitCost / reamSize : 0;
+            paperCost = Number((totalSheets * costPerSheet).toFixed(2));
         }
-    };
 
-    const calculatePrice = () => {
-        let cost = baseCost;
+        let tonerCost = 0;
+        if (selectedToner) {
+            const capacity = 20000;
+            const totalPages = pages * copies;
+            const tonerUnitCost = Number(selectedToner.cost_price || selectedToner.cost_per_unit || selectedToner.cost || 0);
+            const costPerPage = tonerUnitCost / capacity;
+            tonerCost = Number((totalPages * costPerPage).toFixed(2));
+        }
 
-        // Apply market adjustments
-        if (config.marketAdjustmentId) {
-            const adjustment = adjustments.find(a => a.id === config.marketAdjustmentId);
-            if (adjustment) {
-                if (adjustment.type === 'PERCENTAGE' || adjustment.type === 'PERCENT' || adjustment.type === 'percentage') {
-                    cost = cost * (1 + (adjustment.value || adjustment.percentage || 0) / 100);
-                } else {
-                    cost = cost + adjustment.value;
+        const finishingCost = finishingOptions
+            .filter(o => o.enabled)
+            .reduce((sum, o) => {
+                return sum + (o.cost * copies);
+            }, 0);
+
+        const baseCost = paperCost + tonerCost + finishingCost;
+        
+        const marketAdjustmentTotal = marketAdjustmentEnabled 
+            ? marketAdjustments.reduce((sum, adj) => {
+                const type = (adj.type || '').toUpperCase();
+                if (type === 'PERCENTAGE' || type === 'PERCENT') {
+                    return sum + (baseCost * ((adj.value || 0) / 100));
                 }
-            }
-        }
-
-        // Apply base margin
-        const marginMultiplier = 1 + config.baseMargin / 100;
-        let price = cost * marginMultiplier;
-
-        // Apply VAT if enabled and exclusive
-        if (config.vatEnabled && config.vatPricingMode === 'exclusive' && config.vatPercentage) {
-            price = price * (1 + config.vatPercentage / 100);
-        }
-
-        setCalculatedPrice(price);
+                return sum + ((adj.value || 0) * pages * copies);
+            }, 0)
+            : 0;
+        
+        const finalPrice = baseCost + marketAdjustmentTotal;
+        
+        return { paperCost, tonerCost, finishingCost, baseCost, marketAdjustmentTotal, finalPrice };
     };
 
-    const saveConfig = async () => {
-        setSaving(true);
-        try {
-            await dbService.saveSetting('smartPricingConfig', config);
-            notify('Smart pricing configuration saved', 'success');
-        } catch (error) {
-            console.error('Error saving config:', error);
-            notify('Failed to save configuration', 'error');
-        } finally {
-            setSaving(false);
-        }
+    const { paperCost, tonerCost, finishingCost, baseCost, marketAdjustmentTotal, finalPrice } = calculateCosts();
+
+    const handlePagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = parseInt(e.target.value, 10);
+        if (!isNaN(value) && value >= 1 && value <= 10000) setPages(value);
+        else if (e.target.value === '') setPages(1);
     };
 
-    if (loading) {
+    const handleCopiesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = parseInt(e.target.value, 10);
+        if (!isNaN(value) && value >= 1 && value <= 10000) setCopies(value);
+        else if (e.target.value === '') setCopies(1);
+    };
+
+    const toggleFinishingOption = (id: string) => {
+        setFinishingOptions(prev => prev.map(opt => 
+            opt.id === id ? { ...opt, enabled: !opt.enabled } : opt
+        ));
+    };
+
+    const resetCalculator = () => {
+        setPages(1);
+        setCopies(1);
+        if (paperItems.length > 0) setSelectedPaperId(paperItems[0].id);
+        if (tonerItems.length > 0) setSelectedTonerId(tonerItems[0].id);
+        setFinishingOptions(defaultFinishingOptions);
+        setMarketAdjustmentEnabled(true);
+    };
+
+    const formatCurrency = (value: number) => `${currency} ${value.toFixed(2)}`;
+    const totalPages = pages * copies;
+    const totalSheets = Math.ceil(pages / 2) * copies;
+
+    const getItemCost = (item: Item | undefined) => {
+        if (!item) return 0;
+        return Number(item.cost_price || item.cost_per_unit || item.cost || 0);
+    };
+
+    const getItemUnit = (item: Item | undefined) => {
+        if (!item) return '';
+        return item.unit || 'unit';
+    };
+
+    if (isLoading) {
         return (
-            <div className="h-full flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
+            <div className="h-full flex items-center justify-center bg-slate-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Calculator className="w-12 h-12 text-indigo-500 animate-pulse" />
+                    <p className="text-slate-500">Loading pricing engine...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="h-full overflow-auto bg-gradient-to-br from-slate-50 to-indigo-50/30 p-6">
-            <div className="max-w-4xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-indigo-100 rounded-xl">
-                        <Calculator className="w-6 h-6 text-indigo-600" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Smart Pricing Engine</h1>
-                        <p className="text-slate-500">Configure pricing models and market adjustments</p>
-                    </div>
-                </div>
-
-                {/* Pricing Model Selection */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-700 mb-4">Pricing Model</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
-                            { value: 'per-page', label: 'Per Page' },
-                            { value: 'per-learner', label: 'Per Learner' },
-                            { value: 'per-book', label: 'Per Book' },
-                            { value: 'cost-plus', label: 'Cost Plus' }
-                        ].map(model => (
-                            <button
-                                key={model.value}
-                                onClick={() => setConfig({ ...config, pricingModel: model.value as any })}
-                                className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${config.pricingModel === model.value
-                                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
-                                    }`}
-                            >
-                                {model.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Base Margin */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-700 mb-4">Base Margin</h2>
+        <div className="h-full bg-gradient-to-br from-slate-50 to-indigo-50 overflow-auto">
+            <div className="max-w-4xl mx-auto p-6">
+                <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
-                        <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={config.baseMargin}
-                            onChange={(e) => setConfig({ ...config, baseMargin: Number(e.target.value) })}
-                            className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-                        />
-                        <div className="flex items-center gap-2 bg-slate-100 px-4 py-2 rounded-lg">
-                            <Percent className="w-4 h-4 text-slate-500" />
-                            <span className="text-lg font-bold text-slate-700">{config.baseMargin}%</span>
+                        <div className="p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-lg shadow-indigo-200">
+                            <Calculator className="w-8 h-8 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-slate-800">Smart Pricing Engine</h1>
+                            <p className="text-slate-500">Calculate print job pricing with BOM cost analysis</p>
                         </div>
                     </div>
+                    <button 
+                        onClick={() => {
+                            const costs: { [key: string]: number } = {};
+                            finishingOptions.forEach(opt => { costs[opt.id] = opt.cost; });
+                            setEditingCosts(costs);
+                            setShowSettings(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50"
+                    >
+                        <Settings size={18} />
+                        Settings
+                    </button>
                 </div>
 
-                {/* Market Adjustment Selection */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-700 mb-4">Market Adjustment</h2>
-                    {adjustments.length === 0 ? (
-                        <div className="text-center py-8 text-slate-500">
-                            <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                            <p>No active market adjustments found.</p>
-                            <p className="text-sm">Create adjustments in the Market Adjustments module.</p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 space-y-4">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <button 
+                                onClick={() => setPaperExpanded(!paperExpanded)}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-100 rounded-lg">
+                                        <Calculator size={18} className="text-blue-600" />
+                                    </div>
+                                    <h3 className="font-semibold text-slate-800">Print Settings</h3>
+                                </div>
+                                {paperExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </button>
+                            {paperExpanded && (
+                                <div className="px-6 pb-6 space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-2">Pages per Copy</label>
+                                            <input
+                                                type="number"
+                                                value={pages}
+                                                onChange={handlePagesChange}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                                                min={1}
+                                                max={10000}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-2">Number of Copies</label>
+                                            <input
+                                                type="number"
+                                                value={copies}
+                                                onChange={handleCopiesChange}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                                                min={1}
+                                                max={10000}
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-500">
+                                        Sheets needed: <span className="font-medium text-slate-700">{totalSheets}</span> | 
+                                        Total pages: <span className="font-medium text-slate-700">{totalPages}</span>
+                                    </p>
+                                </div>
+                            )}
                         </div>
-                    ) : (
-                        <select
-                            value={config.marketAdjustmentId || ''}
-                            onChange={(e) => setConfig({ ...config, marketAdjustmentId: e.target.value || undefined })}
-                            className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                            <option value="">No adjustment</option>
-                            {adjustments.map(adj => (
-                                <option key={adj.id} value={adj.id}>
-                                    {adj.name} ({adj.type === 'PERCENTAGE' || adj.type === 'PERCENT' || adj.type === 'percentage' ? `${adj.value || adj.percentage}%` : `$${adj.value}`})
-                                </option>
-                            ))}
-                        </select>
-                    )}
-                </div>
 
-                {/* VAT Settings */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-700 mb-4">VAT Settings</h2>
-                    <div className="space-y-4">
-                        <label className="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                checked={config.vatEnabled}
-                                onChange={(e) => setConfig({ ...config, vatEnabled: e.target.checked })}
-                                className="w-5 h-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            <span className="text-slate-700">Enable VAT</span>
-                        </label>
-
-                        {config.vatEnabled && (
-                            <>
-                                <div className="flex items-center gap-4">
-                                    <label className="text-sm text-slate-600 w-24">VAT Rate:</label>
-                                    <input
-                                        type="number"
-                                        value={config.vatPercentage || 16.5}
-                                        onChange={(e) => setConfig({ ...config, vatPercentage: Number(e.target.value) })}
-                                        className="w-24 p-2 border border-slate-200 rounded-lg"
-                                    />
-                                    <span className="text-slate-500">%</span>
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <button 
+                                onClick={() => setBomExpanded(!bomExpanded)}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-amber-100 rounded-lg">
+                                        <Package size={18} className="text-amber-600" />
+                                    </div>
+                                    <h3 className="font-semibold text-slate-800">BOM Materials (Auto-selected)</h3>
+                                    <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">Active</span>
                                 </div>
+                                {bomExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </button>
+                            {bomExpanded && (
+                                <div className="px-6 pb-6 space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-600 mb-2">Paper</label>
+                                        {paperItems.length > 0 ? (
+                                            <select
+                                                value={selectedPaperId}
+                                                onChange={(e) => setSelectedPaperId(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {paperItems.map(item => (
+                                                    <option key={item.id} value={item.id}>
+                                                        {item.name} - {currency} {getItemCost(item).toFixed(2)}/{getItemUnit(item)} (Stock: {item.stock || 0})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm">No paper items found</div>
+                                        )}
+                                        {selectedPaper && (
+                                            <div className="mt-2 p-3 bg-blue-50 rounded-xl">
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-600">Sheets needed:</span>
+                                                    <span className="font-medium text-slate-800">{totalSheets} sheets</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-600">Paper cost:</span>
+                                                    <span className="font-medium text-blue-600">{formatCurrency(paperCost)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
 
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2">
-                                        <input
-                                            type="radio"
-                                            name="vatMode"
-                                            checked={config.vatPricingMode === 'inclusive'}
-                                            onChange={() => setConfig({ ...config, vatPricingMode: 'inclusive' })}
-                                            className="w-4 h-4 text-indigo-600"
-                                        />
-                                        <span className="text-slate-700">Inclusive</span>
-                                    </label>
-                                    <label className="flex items-center gap-2">
-                                        <input
-                                            type="radio"
-                                            name="vatMode"
-                                            checked={config.vatPricingMode === 'exclusive'}
-                                            onChange={() => setConfig({ ...config, vatPricingMode: 'exclusive' })}
-                                            className="w-4 h-4 text-indigo-600"
-                                        />
-                                        <span className="text-slate-700">Exclusive</span>
-                                    </label>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-600 mb-2">Toner/Ink</label>
+                                        {tonerItems.length > 0 ? (
+                                            <select
+                                                value={selectedTonerId}
+                                                onChange={(e) => setSelectedTonerId(e.target.value)}
+                                                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500"
+                                            >
+                                                {tonerItems.map(item => (
+                                                    <option key={item.id} value={item.id}>
+                                                        {item.name} - {currency} {getItemCost(item).toFixed(2)}/{getItemUnit(item)} (Stock: {item.stock || 0})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <div className="p-3 bg-red-50 text-red-600 rounded-xl text-sm">No toner items found</div>
+                                        )}
+                                        {selectedToner && (
+                                            <div className="mt-2 p-3 bg-purple-50 rounded-xl">
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-600">Pages to print:</span>
+                                                    <span className="font-medium text-slate-800">{totalPages} pages</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm">
+                                                    <span className="text-slate-600">Toner cost:</span>
+                                                    <span className="font-medium text-purple-600">{formatCurrency(tonerCost)}</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </>
-                        )}
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <button 
+                                onClick={() => setFinishingExpanded(!finishingExpanded)}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-purple-100 rounded-lg">
+                                        <Info size={18} className="text-purple-600" />
+                                    </div>
+                                    <h3 className="font-semibold text-slate-800">Finishing Options</h3>
+                                </div>
+                                {finishingExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </button>
+                            {finishingExpanded && (
+                                <div className="px-6 pb-6">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {finishingOptions.map(option => (
+                                            <label 
+                                                key={option.id} 
+                                                className={`flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all ${
+                                                    option.enabled ? 'bg-purple-50 border-purple-200' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
+                                                } border`}
+                                            >
+                                                <div className="flex-1">
+                                                    <div className="font-medium text-slate-800">{option.name}</div>
+                                                    <div className="text-xs text-slate-500">{option.description}</div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm font-medium text-slate-600">{currency} {option.cost}</span>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={option.enabled}
+                                                        onChange={() => toggleFinishingOption(option.id)}
+                                                        className="w-5 h-5 text-purple-600 rounded"
+                                                    />
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                            <button 
+                                onClick={() => setMarketExpanded(!marketExpanded)}
+                                className="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-100 rounded-lg">
+                                        <Calculator size={18} className="text-emerald-600" />
+                                    </div>
+                                    <h3 className="font-semibold text-slate-800">Market Adjustments</h3>
+                                </div>
+                                {marketExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                            </button>
+                            {marketExpanded && (
+                                <div className="px-6 pb-6">
+                                    <label className="flex items-center justify-between p-4 bg-emerald-50 rounded-xl cursor-pointer mb-4">
+                                        <div>
+                                            <span className="font-medium text-slate-800">Apply Market Adjustments</span>
+                                            <p className="text-xs text-slate-500">Include inflation, logistics & cost layers</p>
+                                        </div>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={marketAdjustmentEnabled}
+                                            onChange={() => setMarketAdjustmentEnabled(!marketAdjustmentEnabled)}
+                                            className="w-5 h-5 text-emerald-600 rounded"
+                                        />
+                                    </label>
+                                    {marketAdjustmentEnabled && marketAdjustments.length > 0 && (
+                                        <div className="space-y-2">
+                                            {marketAdjustments.map(adj => (
+                                                <div key={adj.id} className="flex justify-between p-3 bg-slate-50 rounded-lg">
+                                                    <span className="text-sm text-slate-600">{adj.name}</span>
+                                                    <span className="text-sm font-medium text-emerald-600">+{adj.percentage || adj.value || 0}%</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {marketAdjustmentEnabled && marketAdjustments.length === 0 && (
+                                        <p className="text-sm text-slate-500 italic">No market adjustments configured.</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
 
-                {/* Price Calculator */}
-                <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-                    <h2 className="text-lg font-semibold text-slate-700 mb-4">Price Calculator</h2>
                     <div className="space-y-4">
-                        <div className="flex items-center gap-4">
-                            <label className="text-sm text-slate-600 w-32">Base Cost:</label>
-                            <div className="flex items-center gap-2 flex-1">
-                                <DollarSign className="w-4 h-4 text-slate-400" />
-                                <input
-                                    type="number"
-                                    value={baseCost}
-                                    onChange={(e) => setBaseCost(Number(e.target.value))}
-                                    className="flex-1 p-2 border border-slate-200 rounded-lg"
-                                    placeholder="Enter base cost"
-                                />
+                        <div className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden sticky top-6">
+                            <div className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600">
+                                <h3 className="text-white font-semibold text-lg">Price Summary</h3>
+                                <p className="text-indigo-200 text-sm">{pages} pages × {copies} copies = {totalPages} total</p>
+                            </div>
+                            
+                            <div className="p-6 space-y-4">
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Paper ({selectedPaper?.name || 'N/A'})</span>
+                                    <span className="font-medium">{formatCurrency(paperCost)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Toner ({selectedToner?.name || 'N/A'})</span>
+                                    <span className="font-medium">{formatCurrency(tonerCost)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Finishing</span>
+                                    <span className="font-medium">{formatCurrency(finishingCost)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Subtotal</span>
+                                    <span className="font-medium">{formatCurrency(baseCost)}</span>
+                                </div>
+                                {marketAdjustmentEnabled && marketAdjustmentTotal > 0 && (
+                                    <div className="flex justify-between text-emerald-600">
+                                        <span>Market Adjustments</span>
+                                        <span className="font-medium">+{formatCurrency(marketAdjustmentTotal)}</span>
+                                    </div>
+                                )}
+                                <div className="border-t-2 border-indigo-100 pt-4 flex justify-between">
+                                    <span className="font-bold text-slate-800">Total</span>
+                                    <span className="text-2xl font-bold text-indigo-600">{formatCurrency(finalPrice)}</span>
+                                </div>
+                                <div className="text-center text-xs text-slate-400">
+                                    Per copy: {formatCurrency(finalPrice / copies)}
+                                </div>
+                            </div>
+
+                            <div className="px-6 pb-6 space-y-3">
+                                <button 
+                                    onClick={resetCalculator}
+                                    className="w-full flex items-center justify-center gap-2 py-3 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors"
+                                >
+                                    <RefreshCw size={18} />
+                                    Reset
+                                </button>
+                                <button 
+                                    onClick={async () => {
+                                        const jobOrder = {
+                                            id: `JO-${Date.now()}`,
+                                            orderNumber: `JO-${Date.now()}`,
+                                            customerName: 'Direct Job Order',
+                                            customerId: '',
+                                            date: new Date().toISOString(),
+                                            dueDate: new Date().toISOString(),
+                                            status: 'pending',
+                                            items: [{
+                                                id: `ITEM-${Date.now()}`,
+                                                itemId: selectedPaper?.id || '',
+                                                name: `Print Job - ${pages} pages x ${copies} copies`,
+                                                description: `Paper: ${selectedPaper?.name || 'N/A'}, Toner: ${selectedToner?.name || 'N/A'}`,
+                                                quantity: copies,
+                                                unitPrice: finalPrice / copies,
+                                                total: finalPrice
+                                            }],
+                                            subtotal: finalPrice,
+                                            tax: 0,
+                                            discount: 0,
+                                            total: finalPrice,
+                                            notes: `Finishing: ${finishingOptions.filter(o => o.enabled).map(o => o.name).join(', ') || 'None'}`,
+                                            paymentStatus: 'unpaid',
+                                            createdAt: new Date().toISOString()
+                                        };
+                                        await addJobOrder(jobOrder as any);
+                                        navigate('/sales-flow/job-tickets');
+                                    }}
+                                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+                                >
+                                    Create Job Order
+                                </button>
                             </div>
                         </div>
 
-                        <button
-                            onClick={calculatePrice}
-                            className="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Calculate Price
-                        </button>
-
-                        {calculatedPrice !== null && (
-                            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                                <div className="text-sm text-green-600 mb-1">Calculated Price</div>
-                                <div className="text-3xl font-bold text-green-700">
-                                    ${calculatedPrice.toFixed(2)}
+                        <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+                            <h4 className="font-medium text-slate-800 mb-3">Inventory Stats</h4>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Paper Types</span>
+                                    <span className="font-medium">{paperItems.length}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Toner Types</span>
+                                    <span className="font-medium">{tonerItems.length}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Market Adjustments</span>
+                                    <span className="font-medium">{marketAdjustments.length}</span>
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
-
-                {/* Save Button */}
-                <button
-                    onClick={saveConfig}
-                    disabled={saving}
-                    className="w-full py-3 bg-slate-800 text-white rounded-lg font-medium hover:bg-slate-900 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                    <Save className="w-4 h-4" />
-                    {saving ? 'Saving...' : 'Save Configuration'}
-                </button>
             </div>
+
+            {showSettings && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+                            <h2 className="text-xl font-bold text-slate-800">Finishing Options Settings</h2>
+                            <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-slate-100 rounded-lg">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <p className="text-sm text-slate-500 mb-4">Set the default cost for each finishing option (per unit):</p>
+                            {finishingOptions.map(option => (
+                                <div key={option.id} className="flex items-center justify-between">
+                                    <label className="text-sm font-medium text-slate-700">{option.name}</label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-slate-500">{currency}</span>
+                                        <input
+                                            type="number"
+                                            value={editingCosts[option.id] ?? option.cost}
+                                            onChange={(e) => setEditingCosts(prev => ({ ...prev, [option.id]: parseFloat(e.target.value) || 0 }))}
+                                            className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-right"
+                                            min={0}
+                                            step={0.01}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-6 border-t border-slate-100 flex gap-3">
+                            <button 
+                                onClick={() => setShowSettings(false)}
+                                className="flex-1 py-3 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={async () => {
+                                    const newCosts: Record<string, number> = {};
+                                    finishingOptions.forEach(opt => {
+                                        newCosts[opt.id] = editingCosts[opt.id] ?? opt.cost;
+                                    });
+                                    await dbService.saveSetting('finishingOptionCosts', newCosts);
+                                    setFinishingOptions(prev => prev.map(opt => ({
+                                        ...opt,
+                                        cost: newCosts[opt.id] ?? opt.cost
+                                    })));
+                                    setShowSettings(false);
+                                }}
+                                className="flex-1 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700"
+                            >
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

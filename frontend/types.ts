@@ -41,6 +41,7 @@ export interface TransactionSettingsConfig {
     showCategoryFilters: boolean;
     photocopyPrice: number;
     typePrintingPrice: number;
+    staplePrice: number;
     receiptFooter: string;
     requireCustomer: boolean;
     defaultPaymentMethod: string;
@@ -431,16 +432,23 @@ export interface JobTicketSettings {
 
 export type AuditLogEntry = any; // TIER 2: Added as any due to missing definitions
 export type ExamInvoiceClassSummary = any; // TIER 2: Added as any due to missing definitions
+export type ItemType = 'Raw Material' | 'Service' | 'Product' | 'Stationery';
+
 export interface Item {
   id: string;
   name: string;
   sku: string;
-  type: 'Product' | 'Material' | 'Service' | 'Stationery';
+  barcode?: string;
+  type: ItemType;
   category?: string;
   description?: string;
   unit?: string;
   cost: number;
+  cost_price?: number;
   price: number;
+  selling_price?: number;
+  calculated_price?: number;
+  rounding_adjustment?: number;
   stock: number;
   minStockLevel?: number;
   reorderPoint?: number;
@@ -458,16 +466,19 @@ export interface Item {
   pricingConfig?: PricingConfig;
   variants?: ProductVariant[];
   adjustmentSnapshots?: any[];
-  // Stationery Pack-to-Piece Conversion
+  rounding_method?: string;
+  rounding_difference?: number;
+  reserved?: number;
+  locationStock?: { warehouseId: string; quantity: number }[];
+  smartPricing?: SmartPricingConfig;
   isStationeryPack?: boolean;
   costPerPack?: number;
   unitsPerPack?: number;
   sellingPricePerPiece?: number;
   costPerPiece?: number;
   profitPerPiece?: number;
-  roundingMethod?: 'none' | 'nearest' | 'up' | 'down';
-  roundingStrategy?: 'adjustLastUnit' | 'spreadAcrossAll';
-  totalRoundingAdjustment?: number;
+  markup_percent?: number;
+  manual_override?: boolean;
   [key: string]: any;
 }
 export type User = any; // TIER 2: Added as any due to missing definitions

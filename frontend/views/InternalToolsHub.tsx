@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wrench, CreditCard, Barcode, Upload, MessageSquare, Calculator, TrendingUp } from 'lucide-react';
+import { Wrench, CreditCard, Barcode, Upload, MessageSquare, TrendingUp } from 'lucide-react';
 import GenericHub from './GenericHub';
 
 const InternalToolsHub: React.FC = () => {
@@ -30,20 +30,6 @@ const InternalToolsHub: React.FC = () => {
       description: 'Internal team communication and real-time support messaging.',
       path: '/internal-tools/chat',
       icon: <MessageSquare />,
-      color: 'bg-amber-50 text-amber-500'
-    },
-    {
-      label: 'Smart pricing engine',
-      description: 'Calculate item prices with market adjustments and generate revenue reports.',
-      path: '/internal-tools/pricing',
-      icon: <Calculator />,
-      color: 'bg-indigo-50 text-indigo-500'
-    },
-    {
-      label: 'Market adjustments',
-      description: 'Manage global cost layers, inflation adjustments, and logistics surcharges.',
-      path: '/internal-tools/adjustments',
-      icon: <TrendingUp />,
       color: 'bg-amber-50 text-amber-500'
     }
   ];

@@ -11,7 +11,8 @@ import {
   Landmark, Coins, Landmark as Bank, Scale, FileBarChart, PieChart as Pie,
   Wallet, Target, Truck, ShieldCheck, Database, WifiOff, HardDrive,
   CheckCircle, MonitorPlay, Maximize, Share2, Cpu as Processor, Sparkles,
-  Smartphone, FileSpreadsheet, BookOpen, FileCheck, History
+  Smartphone, FileSpreadsheet, BookOpen, FileCheck, History,
+  Calculator, Search
 } from 'lucide-react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -217,16 +218,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, isCollapsed, toggle, toggleCo
       group: "Intelligence",
       items: [
         {
-          label: 'Forecasting',
-          path: '/supply-chain/forecasting',
-          icon: <TrendingUp size={18} />,
+          label: 'Smart Operations',
+          path: '/smart-operations',
+          icon: <Cpu size={18} />,
           hideSubMenu: true,
           subItems: [
-            { label: 'Inventory Demand', path: '/supply-chain/forecasting?tab=inventory', icon: <Box size={14} /> },
-            { label: 'Cash Flow Projection', path: '/supply-chain/forecasting?tab=cashflow', icon: <DollarSign size={14} /> },
+            { label: 'AI Assistant', path: '/smart-operations/ai', icon: <Sparkles size={14} /> },
+            { label: 'Market Adjustments', path: '/smart-operations/adjustments', icon: <TrendingUp size={14} /> },
+            { label: 'Smart Pricing Engine', path: '/smart-operations/pricing', icon: <Calculator size={14} /> },
+            { label: 'Marketing Messages', path: '/smart-operations/messages', icon: <MessageSquare size={14} /> },
           ]
         },
-        // { label: 'Business Intel', path: '/revenue/intel', icon: <PieChart size={18} /> },
       ]
     },
     {

@@ -128,6 +128,7 @@ const Settings: React.FC = () => {
                 },
                 photocopyPrice: 0,
                 typePrintingPrice: 0,
+                staplePrice: 0,
                 receiptFooter: ''
             },
             numbering: {},
@@ -1421,6 +1422,20 @@ const Settings: React.FC = () => {
                                                     onChange={e => setConfig({ ...config, transactionSettings: { ...config.transactionSettings, pos: { ...config.transactionSettings?.pos, typePrintingPrice: parseFloat(e.target.value) || 0 } } as any })}
                                                 />
                                             </div>
+                                        </div>
+                                        <div>
+                                            <label className="settings-label">Stapling Price per Copy ({currency})</label>
+                                            <div className="relative">
+                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-slate-300 text-xs">{currency}</span>
+                                                <input
+                                                    type="number"
+                                                    className="settings-input pl-10"
+                                                    placeholder="e.g. 20"
+                                                    value={config.transactionSettings?.pos?.staplePrice || 0}
+                                                    onChange={e => setConfig({ ...config, transactionSettings: { ...config.transactionSettings, pos: { ...config.transactionSettings?.pos, staplePrice: parseFloat(e.target.value) || 0 } } as any })}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-1">Price added per copy when stapling is required.</p>
                                         </div>
                                     </div>
                                 </section>

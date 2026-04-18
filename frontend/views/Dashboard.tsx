@@ -10,8 +10,6 @@ import {
   MessageSquare, Calculator, FileText, Zap, ArrowRight, ChevronRight,
   Sparkles, Database, BarChart2, X, ArrowUp, ArrowDown, Building2,
   CheckCircle2, Trash2, ExternalLink, Star, Sun, Calendar} from 'lucide-react';
-import { PricingCalculatorProvider, usePricingCalculator } from '../context/PricingCalculatorContext';
-import PricingCalculator from '../components/PricingCalculator';
 import WhatsAppMarketingModal from '../components/WhatsAppMarketingModal';
 import { dbService } from '../services/db';
 import { formatNumber, parseFormattedNumber } from '../utils/helpers';
@@ -712,7 +710,6 @@ const useWindowSize = () => {
 const DashboardContent: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const { setIsOpen: setCalculatorOpen } = usePricingCalculator();
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -1459,7 +1456,7 @@ const DashboardContent: React.FC = () => {
             {/* Action Buttons — icon only on mobile */}
             <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8 }}>
               <button
-                onClick={() => setCalculatorOpen(true)}
+                onClick={() => navigate('/internal-tools/pricing')}
                 style={{
                   padding: isMobile ? '8px' : '8px 16px',
                   borderRadius: 999,
@@ -2277,10 +2274,7 @@ const DashboardContent: React.FC = () => {
 };
 
 const Dashboard: React.FC = () => (
-  <PricingCalculatorProvider>
-    <DashboardContent />
-    <PricingCalculator />
-  </PricingCalculatorProvider>
+  <DashboardContent />
 );
 
 export default Dashboard;
