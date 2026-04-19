@@ -527,7 +527,18 @@ async function startServer() {
       }
       next();
   }, auditCrudMiddleware('examination_batch'), examinationRoutes);
-  
+
+  // --- Profit Margin Settings Endpoints ---
+  const settingsRoutes = require('./routes/settings.cjs');
+  app.use('/api/settings', (req, res, next) => {
+    const userId = req.headers['x-user-id'];
+    const userRole = req.headers['x-user-role'];
+    if (!userId || !userRole) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+  }, settingsRoutes);
+
   // Production fallback endpoint: return a basic set of work centers/resources
   app.get('/api/production/seed-work-centers', (req, res) => {
     const mockWorkCenters = [

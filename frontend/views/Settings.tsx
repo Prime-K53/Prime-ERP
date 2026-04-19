@@ -1,4 +1,4 @@
-
+﻿
 import React, { useDeferredValue, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -9,14 +9,14 @@ import {
     FileText, PackageCheck, Wallet,
     Globe, Clock, Key, Lock, Gauge, Binary, Plus, X, Percent,
     Cpu, Layers, Smartphone, Layout, Users, ShoppingBag, ShoppingCart, Palette, Monitor,
-    Factory, Box, Cloud, Bell, Mail, MessageSquare, ShieldAlert, Webhook, Sun, Moon, Laptop, Info, Undo2
+    Factory, Box, Cloud, Bell, Mail, MessageSquare, ShieldAlert, Webhook, Sun, Moon, Laptop, Info, Undo2,
+    TrendingUp
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { CompanyConfig, NumberingRule, PricingRoundingMethod } from '../types';
 import { OfflineImage } from '../components/OfflineImage';
 import { localFileStorage } from '../services/localFileStorage';
-import { DEFAULT_PRICING_SETTINGS, ROUNDING_METHOD_OPTIONS, getRoundingAnalytics } from '../services/pricingRoundingService';
-import { PricingSettingsValidator, PricingSettingsValidationResult } from '../services/pricingSettingsValidation';
+import { DEFAULT_PRICING_SETTINGS, ROUNDING_METHOD_OPTIONS, getRoundingAnalytics } from '../services/pricingRoundingService';import { PricingSettingsValidator, PricingSettingsValidationResult } from '../services/pricingSettingsValidation';
 import { z } from 'zod';
 
 import { api } from '../services/api';
@@ -35,6 +35,7 @@ import {
     resolvePrimeTemplateSettings,
 } from './shared/components/PDF/templateSettings';
 import { TwoFactorSetup } from './settings/components/TwoFactorSetup';
+import ProfitMarginSettings from './settings/ProfitMarginSettings';
 
 // Pricing settings validation using reusable utility
 
@@ -544,6 +545,12 @@ const Settings: React.FC = () => {
             ]
         },
         {
+            title: 'Pricing',
+            items: [
+                { id: 'ProfitMargins', icon: TrendingUp, label: 'Profit Margins', desc: 'Global, category and line-item margin overrides' }
+            ]
+        },
+        {
             title: 'System & Advanced',
             items: [
                 { id: 'Integrations', icon: Globe, label: 'Integrations', desc: 'API and external services' },
@@ -762,7 +769,7 @@ const Settings: React.FC = () => {
                                                         onChange={e => setConfig({ ...config, monthlyRevenueTarget: Number(e.target.value) })}
                                                     />
                                                 </div>
-                                                <p className="text-[10px] text-slate-400 mt-1.5 font-medium italic">Your progress percentage against this هدف will be tracked on the dashboard.</p>
+                                                <p className="text-[10px] text-slate-400 mt-1.5 font-medium italic">Your progress percentage against this Ù‡Ø¯Ù will be tracked on the dashboard.</p>
                                             </div>
                                         </div>
                                     </div>
@@ -3445,7 +3452,7 @@ const Settings: React.FC = () => {
                                                 <h4 className="text-2xl font-bold text-[#393A3D] mb-2">Restore Database</h4>
                                                 <p className="text-sm text-[#6B6C6F] leading-relaxed mb-4 max-w-xs mx-auto">Restore a previously downloaded Prime ERP backup file and reload the full local database state.</p>
                                                 <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-6">
-                                                    Last restore: {backupStatus.lastRestoreAt ? `${new Date(backupStatus.lastRestoreAt).toLocaleString()}${backupStatus.lastRestoreFile ? ` • ${backupStatus.lastRestoreFile}` : ''}` : 'No restore executed'}
+                                                    Last restore: {backupStatus.lastRestoreAt ? `${new Date(backupStatus.lastRestoreAt).toLocaleString()}${backupStatus.lastRestoreFile ? ` â€¢ ${backupStatus.lastRestoreFile}` : ''}` : 'No restore executed'}
                                                 </div>
                                                 <button
                                                     onClick={handleRestoreBackupRequest}
@@ -3743,6 +3750,22 @@ const Settings: React.FC = () => {
                                 </div>
                             )
                         }
+
+                        {activeTab === 'ProfitMargins' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                                        <TrendingUp size={20} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-black text-slate-900">Profit Margin Overrides</h2>
+                                        <p className="text-xs text-slate-500">Manage global, category and line-item pricing margins. Requires Admin or Finance Manager role.</p>
+                                    </div>
+                                </div>
+                                <ProfitMarginSettings />
+                            </div>
+                        )}
+
                     </div >
                 </div >
             </div>

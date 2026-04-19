@@ -613,6 +613,39 @@ const initDb = () => {
       db.run(`CREATE INDEX IF NOT EXISTS idx_exam_bom_calc_batch_class ON examination_bom_calculations(batch_id, class_id)`);
       db.run(`CREATE INDEX IF NOT EXISTS idx_bom_default_materials_preferred ON bom_default_materials(preferred_item_id)`);
 
+      // -----------------------------------------------------------------------
+      // Profit Margin Settings & Overrides
+      // -----------------------------------------------------------------------
+      db.run(`CREATE TABLE IF NOT EXISTS profit_margin_settings (
+        id TEXT PRIMARY KEY,
+        scope TEXT NOT NULL CHECK(scope IN ('global', 'category', 'line_item')),
+        scope_ref_id TEXT, -- category ID or line-item/product SKU
+        margin_type TEXT NOT NULL CHECK(margin_type IN ('percentage', 'fixed_amount')),
+        margin_value REAL NOT NULL,
+        is_active INTEGER DEFAULT 1,
+        reason TEXT,
+        created_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        deleted_at DATETIME
+      )`);
+
+      db.run(`CREATE TABLE IF NOT EXISTS profit_margin_audit_logs (
+        id TEXT PRIMARY KEY,
+        setting_id TEXT,
+        action TEXT NOT NULL, -- CREATE, UPDATE, DELETE, TOGGLE
+        scope TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        reason TEXT,
+        performed_by TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`);
+
+      db.run(`CREATE INDEX IF NOT EXISTS idx_pms_resolution ON profit_margin_settings(scope, scope_ref_id, is_active, deleted_at)`);
+      db.run(`CREATE INDEX IF NOT EXISTS idx_pm_audit_setting ON profit_margin_audit_logs(setting_id)`);
+      db.run(`CREATE INDEX IF NOT EXISTS idx_pm_audit_timestamp ON profit_margin_audit_logs(timestamp)`);
+
       // Sales Orders Table (Phase 1 - Sales Module)
       db.run(`CREATE TABLE IF NOT EXISTS sales_orders (
         id TEXT PRIMARY KEY,
